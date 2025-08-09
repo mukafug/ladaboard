@@ -1,0 +1,1871 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LadaBoard - Storyboard Maker</title>
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+<style>
+:root{--bg:#0f1115;--panel:#141619;--muted:#9aa3b2;--accent:#9b6cff;--accent-2:#5be3c8;}
+*{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,system-ui,Arial}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0e 0%, #0f1115 100%);color:#e6eef8}
+.app{display:grid;grid-template-columns:360px 1fr;gap:18px;padding:18px;height:100vh}
+.sidebar{background:var(--panel);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+.header{display:flex;gap:8px;align-items:center}
+.logo{padding:8px 12px;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:8px;font-weight:700}
+.controls{display:flex;gap:8px;margin-left:auto}
+.btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:var(--muted);cursor:pointer; display:inline-flex; align-items:center; gap: 6px;}
+.btn:hover{filter:brightness(1.05)}
+.mode-toggle{display:flex;gap:6px}
+.mode-toggle button{padding:6px 10px;border-radius:8px;border:none;cursor:pointer}
+.mode-toggle .active{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#071017}
+.list{flex:1;overflow:auto;padding:6px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);border-radius:8px}
+.frame{display:grid;grid-template-columns:56px 1fr 64px;gap:10px;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);margin-bottom:8px;border:1px solid rgba(255,255,255,0.02)}
+.thumb{width:56px;height:40px;border-radius:4px;background:#0a0a0b;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;overflow:hidden}
+.meta{display:flex;flex-direction:column;gap:6px}
+.meta input[type=text]{width:100%;background:transparent;border:none;color:inherit;outline:none}
+.small{font-size:12px;color:var(--muted)}
+.side-right{background:var(--panel);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.canvas-stage{background:#050607;border-radius:8px;flex:1;display:flex;align-items:center;justify-content:center;position:relative}
+.canvas-stage canvas{max-width:100%;max-height:100%;background:#fff;border-radius:4px}
+.toolbar{display:flex;gap:8px;align-items:center}
+.input{padding:8px;border-radius:6px;background:#0b0c0d;border:1px solid rgba(255,255,255,0.03);color:var(--muted);font-family:inherit}
+.row{display:flex;gap:8px;align-items:center}
+.footer{display:flex;justify-content:space-between;align-items:center;padding-top:8px}
+.file-actions{display:flex;gap:8px}
+.badge{background:rgba(255,255,255,0.04);padding:6px 8px;border-radius:6px;color:var(--muted)}
+.dialog{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:999}
+.dialog.open{display:flex;touch-action:none}
+.modal{width:920px;background:var(--panel);border-radius:8px;padding:8px;box-shadow:0 20px 60px rgba(0,0,0,0.7)}
+.canvas-toolbar{display:flex;gap:8px;align-items:center;padding:8px}
+.toolbtn{padding:6px;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer; font-size: 20px; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center;}
+.toolbtn.active{background:rgba(255,255,255,0.03);color:#fff}
+.slider{width:150px}
+.color-swatch{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);cursor:pointer}
+.small-muted{font-size:12px;color:var(--muted)}
+.icon-bx{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:20px; color: var(--muted);}
+.truncate{max-width:500px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+textarea.input{resize:vertical;min-height:44px;max-height:140px}
+.bx { vertical-align: middle; }
+.small-edit{padding:4px 6px;font-size:12px;border-radius:6px}
+/* Empty state inside the frames list */
+.empty-state {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:18px;
+  height:180px; /* adjust if you want larger */
+  border-radius:8px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+  color: var(--muted);
+}
+.empty-state .big-btn {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: #071017;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  width: 70%;
+  max-width: 260px;
+}
+.empty-state .small-line {
+  font-size: 13px;
+  color: var(--muted);
+  text-align:center;
+  max-width: 280px;
+}
+/* small canvas overlay text style - not required but keeps consistent look */
+.guide-label {
+  font-family: "Segoe UI", sans-serif;
+  font-size: 12px;
+  fill: #fff;
+  pointer-events: none;
+}
+/* Guide panel styles */
+.guide-panel {
+  position: absolute;
+  top: 56px; /* adjust if toolbar height differs */
+  right: 24px; /* align under toolbar area (change as needed) */
+  width: 680px;
+  max-width: calc(100% - 40px);
+  background: linear-gradient(180deg, rgba(20,20,20,0.98), rgba(16,16,16,0.96));
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  z-index: 1200;
+  display: none;
+  gap: 8px;
+  color: var(--muted);
+}
+
+/* show state */
+.guide-panel.open { display: block; }
+
+/* panel contents */
+.guide-row { display:flex; gap:12px; align-items:flex-start; }
+.bx-icon { width:48px; height:48px; display:flex; align-items:center; justify-content:center; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:8px; color:#071017; font-size:20px; }
+
+/* make inputs compact in panel */
+.guide-panel .input { padding:6px; font-size:13px; }
+.guide-panel .small-edit { padding:6px 8px; font-size:13px; }
+
+/* responsive: if narrow screen, panel becomes full width below toolbar */
+@media (max-width: 900px) {
+  .guide-panel { left:12px; right:12px; top:64px; width:auto; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="header">
+      <div class="logo"><i class='bx bxs-story'><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 343.18" width="15" height="15"><defs><style>.cls-1{fill:#fff;}</style></defs><g id="Layer_2" data-name="Layer 2"><g id="Layer_2-2" data-name="Layer 2"><path class="cls-1" d="M256,119.65,200,73.56a32.13,32.13,0,0,0-15.48-12.74L115,3.53c-6.6-5.44-12-4.48-12,2.12v53H32a32,32,0,0,0-32,32v196a32,32,0,0,0,32,32H173a32.07,32.07,0,0,0,30.48-22.26L256,339.65c6.6,5.43,12,4.48,12-2.12v-196C268,134.93,262.6,125.08,256,119.65Zm-91,159H40v-180h63v103c0,6.6,5.4,16.44,12,21.88l50,41.18Z"/></g></g></svg>
+      </i> LadaBoard</div>
+      <div class="controls">
+        <div class="mode-toggle" id="modeToggle">
+          <button class="active" data-mode="draw">Draw</button>
+          <button data-mode="upload">Upload</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+
+      <input id="projectTitle" class="input truncate" placeholder="Project title..." />
+      <div class="badge" id="fpsBadge">24 FPS</div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="addFrame"><i class='bx bx-plus'></i> New Frame</button>
+      <button class="btn" id="duplicateFrame"><i class='bx bx-copy'></i> Duplicate</button>
+      <button class="btn" id="removeFrame"><i class='bx bx-trash'></i> Delete</button>
+    </div>
+
+    <div class="list" id="framesList" ondragover="event.preventDefault()"></div>
+
+    <div class="row"><div class="small-muted">Drag thumbnails to reorder</div></div>
+
+    <div class="file-actions">
+      <button class="btn" id="saveProject"><i class='bx bx-save'></i> Save</button>
+      <button class="btn" id="loadProject"><i class='bx bx-folder-open'></i> Load</button>
+      <button class="btn" id="exportSpread"><i class='bx bx-spreadsheet'></i> Export Spread</button>
+      <button class="btn" id="exportVideo"><i class='bx bx-film'></i> Export Video</button>
+    </div>
+  </div>
+
+  <div class="side-right">
+    <div class="toolbar">
+      <div class="row"><label class="small-muted">FPS</label><input id="fpsInput" class="input" type="number" value="24" min="1" max="60" style="width:80px" /></div>
+      <div class="row"><label class="small-muted">Default Duration</label><input id="defaultDuration" class="input" type="number" value="24" min="1" style="width:80px" /></div>
+      <div style="margin-left:auto" class="row"><button class="btn" id="playAll"><i class='bx bx-play'></i> Play</button></div>
+    </div>
+
+    <div class="canvas-stage" id="stage">
+      <canvas id="preview" width="1280" height="720"></canvas>
+    </div>
+
+    <div class="row">
+      <div style="flex:1">
+        <!-- changed to textarea so Shift+Enter can make newline -->
+        <textarea id="descInput" class="input" placeholder="Description for selected frame"></textarea>
+      </div>
+      <div><input id="durationInput" class="input" type="number" min="1" value="24" style="width:90px" /></div>
+    </div>
+
+    <div class="footer">
+      <div class="small-muted">Total Frames: <span id="totalFrames">0</span></div>
+      <div class="small-muted">Project length: <span id="projectLength">0s</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Drawing modal -->
+<div class="dialog" id="drawDialog">
+  <div class="modal">
+    <div class="canvas-toolbar">
+      <button data-tool="pen" class="toolbtn active" title="Pen"><i class='bx bx-pencil'></i></button>
+      <button data-tool="eraser" class="toolbtn" title="Eraser"><i class='bx bx-eraser'></i></button>
+      <button data-tool="rect" class="toolbtn" title="Rectangle"><i class='bx bx-rectangle'></i></button>
+      <button data-tool="ellipse" class="toolbtn" title="Ellipse"><i class='bx bxs-circle'></i></button>
+      <button data-tool="bucket" class="toolbtn" title="Paint Bucket"><i class='bx bxs-color-fill'></i></button>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-left:6px">
+        <input type="color" id="colorPicker" value="#000000" style="margin-left:8px" />
+        <input type="range" id="sizeRange" min="1" max="80" value="6" class="slider" />
+      </div>
+
+      <button class="toolbtn" id="undoBtn" title="Undo"><i class='bx bx-undo'></i></button>
+      <button class="toolbtn" id="redoBtn" title="Redo"><i class='bx bx-redo'></i></button>
+      <button class="toolbtn" id="clearBtn" title="Clear Canvas"><i class='bx bx-brush-alt'></i></button>
+
+      <!-- eraser mode toggle -->
+      <div style="display:flex;gap:6px;align-items:center;margin-left:8px">
+        <label class="small-muted">Mode </label>
+        <button id="eraserModeBtn" class="btn" style="padding:6px">Stroke</button>
+      </div>
+
+      <!-- Onion skin controls (paste di canvas-toolbar) -->
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+        <button id="toggleOnion" class="btn" title="Toggle Onion Skin"><i class='bx bx-layer'></i></button>
+      
+        <div style="display:flex;align-items:center;gap:8px;padding-left:6px;">
+          <label class="small-muted" title="Backward frames"><i class='bx bx-chevrons-left' style="vertical-align: middle;"></i></label>
+          <input id="onionBackInput" class="input" type="number" value="2" min="0" max="10" style="width:50px" />
+          
+          <label class="small-muted" title="Forward frames"><i class='bx bx-chevrons-right' style="vertical-align: middle;"></i></label>
+          <input id="onionFwdInput" class="input" type="number" value="2" min="0" max="10" style="width:50px" />
+        </div>
+      </div>
+      <!-- Single Guide button (replace previous guide controls) -->
+      <button id="guideBtn" class="btn" title="Open Guides"><i class='bx bx-grid-alt'></i> </button>
+
+      <!-- floating panel that appears under toolbar -->
+      <div id="guidePanel" class="guide-panel" aria-hidden="true">
+        <div class="guide-row">
+          <div class="bx-icon"><i class='bx bx-camera-movie'></i></div>
+          <div style="flex:1">
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="toggleGuides" class="btn small-edit">Guides</button>
+              <button id="toggleRulers" class="btn small-edit">Rulers</button>
+
+              <label class="small-muted" style="margin-left:6px">Aspect</label>
+              <select id="guideAspect" class="input" style="width:120px;">
+                <option value="1920x1080">16:9 (1920×1080)</option>
+                <option value="1280x720">16:9 (1280×720)</option>
+                <option value="1024x768">4:3 (1024×768)</option>
+              </select>
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+              <label class="small-muted">Title</label>
+              <input id="titleSafePct" class="input" type="number" min="50" max="100" value="90" style="width:64px" />%
+              <label class="small-muted" style="margin-left:8px">Action</label>
+              <input id="actionSafePct" class="input" type="number" min="50" max="100" value="95" style="width:64px" />%
+              <div style="margin-left:auto;display:flex;gap:6px">
+                <button id="closeGuidePanel" class="btn small-edit">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="height:560px;background:#fff;border-radius:6px;margin:8px;display:flex;align-items:center;justify-content:center">
+      <canvas id="drawCanvas" width="1024" height="576" style="background:#fff;border-radius:6px"></canvas>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding:8px">
+      <button class="btn" id="cancelDraw"><i class='bx bx-x'></i> Cancel</button>
+      <button class="btn" id="confirmDraw"><i class='bx bx-check'></i> Confirm</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="uploader" accept="image/*" style="display:none" multiple />
+<input type="file" id="loadProjectInput" accept="application/json" style="display:none" />
+
+<!-- ---------- Frame cache & preload helpers ----------
+let frameCache = []; // parallel array, same length as state.frames. Each entry: { bmp: ImageBitmap|HTMLImageElement, src: original src }
+
+concurrency control
+const PRELOAD_CONCURRENCY = 6; // tweak: 4..12 depending memory/network
+const PRELOAD_BATCH_SIZE = PRELOAD_CONCURRENCY;
+
+function isDataUrl(s) { return typeof s === 'string' && s.startsWith('data:'); }
+
+async function createBitmapFromSrc(src) {
+  try {
+    if (window.createImageBitmap) {
+      const res = await fetch(src);
+      const blob = await res.blob();
+      const bmp = await createImageBitmap(blob);
+      return bmp;
+    } else {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      return img;
+    }
+  } catch (err) {
+    try {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      return img;
+    } catch(e){
+      console.warn('createBitmapFromSrc failed for', src, e);
+      return null;
+    }
+  }
+}
+
+async function preloadFramesWithProgress(frames, onProgress = ()=>{}) {
+  const n = frames.length;
+  frameCache = new Array(n).fill(null);
+
+  function getSrc(f) {
+    if (!f) return null;
+    return f.thumb || f.src || null;
+  }
+
+  const tasks = frames.map((f, idx) => async () => {
+    const src = getSrc(f);
+    if (!src) { frameCache[idx] = null; onProgress(idx+1, n); return; }
+    try {
+      const bmpOrImg = await createBitmapFromSrc(src);
+      frameCache[idx] = { bmp: bmpOrImg, src };
+      onProgress(idx+1, n);
+    } catch (err) {
+      console.warn('preload failed', idx, err);
+      frameCache[idx] = null;
+      onProgress(idx+1, n);
+    }
+  });
+
+  let i = 0;
+  const runners = new Array(Math.min(PRELOAD_BATCH_SIZE, tasks.length)).fill(0).map(async () => {
+    while (i < tasks.length) {
+      const task = tasks[i++];
+      await task();
+    }
+  });
+
+  await Promise.all(runners);
+  return frameCache;
+}
+
+// optional small progress overlay
+function showPreloadOverlay(text) {
+  let el = document.getElementById('preloadOverlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'preloadOverlay';
+    Object.assign(el.style, {
+      position: 'fixed', left: '12px', bottom: '12px', padding: '8px 12px',
+      background: 'rgba(0,0,0,0.7)', color: '#fff', borderRadius: '8px', zIndex: 2000,
+      fontSize: '13px'
+    });
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.style.display = 'block';
+}
+function hidePreloadOverlay() {
+  const el = document.getElementById('preloadOverlay');
+  if (el) el.style.display = 'none';
+}
+
+let _cacheUpdatePending = null;
+function scheduleUpdateFrameCache(debounceMs = 200) {
+  if (_cacheUpdatePending) clearTimeout(_cacheUpdatePending);
+  _cacheUpdatePending = setTimeout(() => {
+    _cacheUpdatePending = null;
+    updateFrameCache();
+  }, debounceMs);
+}
+
+async function updateFrameCache() {
+  if (!state.frames || state.frames.length === 0) {
+    frameCache = [];
+    return;
+  }
+  try {
+    showPreloadOverlay('Preloading frames... 0/' + state.frames.length);
+    await preloadFramesWithProgress(state.frames, (done, total) => {
+      showPreloadOverlay(`Preloading frames... ${done}/${total}`);
+    });
+  } catch (err) {
+    console.warn('updateFrameCache error', err);
+  } finally {
+    hidePreloadOverlay();
+  }
+}
+// ---------- End of Frame cache & preload helpers ---------- -->
+
+<script>
+// LadaBoard Planner — improved eraser & edit behavior
+const state = { frames: [], selected: -1, fps: 24, defaultDuration: 24, mode: 'draw' };
+let editIndex = null; // Used for the drawing modal
+let selectedFrames = new Set();
+let clipboardFrames = [];
+
+const framesList = document.getElementById('framesList');
+const preview = document.getElementById('preview'); const pctx = preview.getContext('2d');
+const fpsInput = document.getElementById('fpsInput'); const fpsBadge = document.getElementById('fpsBadge');
+const defaultDurationInput = document.getElementById('defaultDuration');
+const totalFramesEl = document.getElementById('totalFrames'); const projectLength = document.getElementById('projectLength');
+const descInput = document.getElementById('descInput'); const durationInput = document.getElementById('durationInput');
+
+// drawing modal elements
+const drawDialog = document.getElementById('drawDialog'); const drawCanvas = document.getElementById('drawCanvas'); const dctx = drawCanvas.getContext('2d');
+// ===== Compact Guide panel logic =====
+const guideBtn = document.getElementById('guideBtn');
+const guidePanel = document.getElementById('guidePanel');
+const closeGuidePanel = document.getElementById('closeGuidePanel');
+
+// single shared guides state (keperluan drawGuides function)
+const guidesState = window.guidesState || {
+  enabled: true,
+  rulers: true,
+  artW: 1920, artH: 1080,
+  titleSafePct: 90,
+  actionSafePct: 95
+};
+// expose globally if not already
+window.guidesState = guidesState;
+
+// wire UI elements
+const tgl = document.getElementById('toggleGuides');
+const tr = document.getElementById('toggleRulers');
+const aspect = document.getElementById('guideAspect');
+const titleInp = document.getElementById('titleSafePct');
+const actionInp = document.getElementById('actionSafePct');
+
+function applyGuideUI() {
+  if (!tgl || !tr || !aspect || !titleInp || !actionInp) return;
+  tgl.style.borderColor = guidesState.enabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+  tr.style.borderColor = guidesState.rulers ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+  // set aspect select to current artW/artH
+  aspect.value = `${guidesState.artW}x${guidesState.artH}`;
+  titleInp.value = Math.round(guidesState.titleSafePct);
+  actionInp.value = Math.round(guidesState.actionSafePct);
+}
+
+// toggle panel visibility
+function openGuidePanel() {
+  guidePanel.classList.add('open');
+  guidePanel.setAttribute('aria-hidden', 'false');
+  applyGuideUI();
+}
+function closeGuidePanelFn() {
+  guidePanel.classList.remove('open');
+  guidePanel.setAttribute('aria-hidden', 'true');
+}
+
+// attach events
+if (guideBtn) {
+  guideBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (guidePanel.classList.contains('open')) closeGuidePanelFn(); else openGuidePanel();
+  });
+}
+// close button
+if (closeGuidePanel) closeGuidePanel.addEventListener('click', () => closeGuidePanelFn());
+
+// click outside to close panel
+document.addEventListener('click', (e) => {
+  if (!guidePanel) return;
+  if (!guidePanel.classList.contains('open')) return;
+  if (guidePanel.contains(e.target) || guideBtn.contains(e.target)) return;
+  closeGuidePanelFn();
+});
+
+// wire controls inside panel to guidesState and re-render
+if (tgl) tgl.addEventListener('click', ()=>{ guidesState.enabled = !guidesState.enabled; applyGuideUI(); try { redrawPaths(); drawPreview(); } catch(e){} });
+if (tr) tr.addEventListener('click', ()=>{ guidesState.rulers = !guidesState.rulers; applyGuideUI(); try { redrawPaths(); drawPreview(); } catch(e){} });
+if (aspect) aspect.addEventListener('change', ()=>{
+  const v = (aspect.value || '1920x1080').split('x');
+  guidesState.artW = Number(v[0]) || 1920; guidesState.artH = Number(v[1]) || 1080;
+  try { redrawPaths(); drawPreview(); } catch(e) {}
+});
+if (titleInp) titleInp.addEventListener('change', ()=>{ guidesState.titleSafePct = Math.max(50, Math.min(100, Number(titleInp.value)||90)); try { redrawPaths(); drawPreview(); } catch(e){} });
+if (actionInp) actionInp.addEventListener('change', ()=>{ guidesState.actionSafePct = Math.max(50, Math.min(100, Number(actionInp.value)||95)); try { redrawPaths(); drawPreview(); } catch(e){} });
+
+// ensure UI initial state
+applyGuideUI();
+
+// If you already implemented drawGuides(ctx, w, h) earlier, it will use window.guidesState.
+// If not, include the drawGuides() implementation provided previously (the function that draws artboard, safe areas and rulers).
+
+// drawGuides: draws artboard box, safe areas and rulers on given ctx & canvas size
+function drawGuides(ctx, canvasW, canvasH) {
+  if(!guidesState.enabled) return;
+
+  const artW = guidesState.artW, artH = guidesState.artH;
+  // compute scale to fit artboard inside canvas (cover both drawCanvas & preview)
+  const scale = Math.min(canvasW / artW, canvasH / artH);
+  const aw = Math.round(artW * scale), ah = Math.round(artH * scale);
+  const ox = Math.round((canvasW - aw) / 2), oy = Math.round((canvasH - ah) / 2);
+
+  ctx.save();
+
+  // outer artboard border
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4,4]);
+  ctx.strokeRect(ox+0.5, oy+0.5, aw-1, ah-1);
+
+  // center lines
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(ox + aw/2 + 0.5, oy); ctx.lineTo(ox + aw/2 + 0.5, oy + ah);
+  ctx.moveTo(ox, oy + ah/2 + 0.5); ctx.lineTo(ox + aw, oy + ah/2 + 0.5);
+  ctx.stroke();
+
+  // safe areas
+  const titlePadX = aw * ((100 - guidesState.titleSafePct) / 200); // symmetric inset
+  const titlePadY = ah * ((100 - guidesState.titleSafePct) / 200);
+  const actionPadX = aw * ((100 - guidesState.actionSafePct) / 200);
+  const actionPadY = ah * ((100 - guidesState.actionSafePct) / 200);
+
+  // action safe (outer)
+  ctx.strokeStyle = 'rgba(90,200,180,0.95)'; // teal
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6,4]);
+  ctx.strokeRect(ox + actionPadX + 0.5, oy + actionPadY + 0.5, aw - actionPadX*2 -1, ah - actionPadY*2 -1);
+
+  // title safe (inner)
+  ctx.strokeStyle = 'rgba(240,200,80,0.95)'; // yellow
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4,2]);
+  ctx.strokeRect(ox + titlePadX + 0.5, oy + titlePadY + 0.5, aw - titlePadX*2 -1, ah - titlePadY*2 -1);
+
+  // small labels for safe boxes
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(240,200,80,0.95)';
+  ctx.font = '12px "Segoe UI", sans-serif';
+  ctx.fillText('Title Safe ' + guidesState.titleSafePct + '%', ox + titlePadX + 8, oy + titlePadY + 14);
+  ctx.fillStyle = 'rgba(90,200,180,0.95)';
+  ctx.fillText('Action Safe ' + guidesState.actionSafePct + '%', ox + actionPadX + 8, oy + actionPadY + 14);
+
+  // rulers (top & left) if enabled
+  if (guidesState.rulers) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.lineWidth = 1;
+    ctx.font = '10px "Segoe UI", sans-serif';
+
+    // Decide tick spacing in artboard pixels (virtual). We'll display ticks every 100 virtual px scaled.
+    const virtualTickPx = 100; // every 100 virtual px
+    const tickScaled = virtualTickPx * scale;
+
+    // top ruler
+    for (let x = 0; x <= aw; x += tickScaled) {
+      const posX = ox + x;
+      const v = Math.round(x / scale); // virtual px
+      // major tick
+      ctx.beginPath();
+      ctx.moveTo(posX + 0.5, oy - 1);
+      ctx.lineTo(posX + 0.5, oy - 8);
+      ctx.stroke();
+      ctx.fillText(String(v), posX + 3, oy - 18);
+      // minor ticks: every quarter
+      for (let m = 1; m < 4; m++) {
+        const subX = posX + (tickScaled * m / 4);
+        if (subX > ox + aw) break;
+        ctx.beginPath();
+        ctx.moveTo(subX + 0.5, oy - 1);
+        ctx.lineTo(subX + 0.5, oy - 5);
+        ctx.stroke();
+      }
+    }
+
+    // left ruler
+    for (let y = 0; y <= ah; y += tickScaled) {
+      const posY = oy + y;
+      const v = Math.round(y / scale); // virtual px
+      ctx.beginPath();
+      ctx.moveTo(ox - 1, posY + 0.5);
+      ctx.lineTo(ox - 8, posY + 0.5);
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(ox - 20, posY + 4);
+      ctx.rotate(-Math.PI/2);
+      ctx.fillText(String(v), 0, 0);
+      ctx.restore();
+      // minor ticks
+      for (let m = 1; m < 4; m++) {
+        const subY = posY + (tickScaled * m / 4);
+        if (subY > oy + ah) break;
+        ctx.beginPath();
+        ctx.moveTo(ox - 1, subY + 0.5);
+        ctx.lineTo(ox - 5, subY + 0.5);
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+// ========== Onion Skin Feature ==========
+// state variables (add near other drawing vars)
+let onionEnabled = JSON.parse(localStorage.getItem('ladaboard.onionEnabled') || 'true');
+let onionBackCount = 2;
+let onionFwdCount = 2;
+
+// helper to clamp
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+// attach UI listeners (run once after DOM ready)
+(function initOnionUI(){
+  const toggle = document.getElementById('toggleOnion');
+  const backInput = document.getElementById('onionBackInput');
+  const fwdInput = document.getElementById('onionFwdInput');
+
+  if(!toggle || !backInput || !fwdInput) return; // safe exit if UI not present
+
+  function updateUI(){
+    toggle.style.borderColor = onionEnabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+    backInput.value = String(onionBackCount);
+    fwdInput.value = String(onionFwdCount);
+    // redraw edit canvas if open
+    if(drawDialog.classList.contains('open')) redrawPaths();
+  }
+
+  toggle.addEventListener('click', ()=>{ 
+    onionEnabled = !onionEnabled;
+    localStorage.setItem('ladaboard.onionEnabled', onionEnabled); // Save state
+    updateUI();
+  });
+  backInput.addEventListener('change', ()=>{ onionBackCount = clamp(Number(backInput.value), 0, 10); updateUI(); });
+  fwdInput.addEventListener('change', ()=>{ onionFwdCount = clamp(Number(fwdInput.value), 0, 10); updateUI(); });
+  updateUI();
+})();
+
+// draw single thumbnail image to ctx using existing drawImageCover util
+function drawThumbInto(ctx, img, alpha, tint) {
+  if(!img) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // draw image cover to full canvas
+  try { drawImageCover(ctx, img, drawCanvas.width, drawCanvas.height); } catch(e){}
+  if(tint){
+    // simple tint overlay
+    ctx.fillStyle = tint;
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
+  }
+  ctx.restore();
+}
+
+// ensure Image object for a frame (cache it on frame._img)
+function ensureFrameImage(frame){
+  if(!frame) return null;
+  if(frame._img && frame._img.src === frame.thumb) return frame._img;
+  if(!frame.thumb) return null;
+  const im = new Image();
+  im.src = frame.thumb;
+  // when loaded, request a redraw of the draw canvas if it's open
+  im.onload = ()=>{ if(drawDialog.classList.contains('open')) redrawPaths(); };
+  frame._img = im;
+  return im;
+}
+
+// main onion rendering — draws backward (older) and forward frames
+function renderOnionSkins(ctx, refIndex){
+  if(!onionEnabled) return;
+  if(typeof refIndex !== 'number' || refIndex < 0) return;
+
+  // backward frames: tint reddish/orange
+  for(let i = 1; i <= onionBackCount; i++){
+    const idx = refIndex - i;
+    if(idx < 0 || !state.frames[idx]) continue;
+    const f = state.frames[idx];
+    const img = ensureFrameImage(f);
+    const alpha = 0.45 * (1 - (i-1) / Math.max(1, onionBackCount)); // nearer = stronger
+    drawThumbInto(ctx, img, alpha, 'rgba(255,120,90,0.18)'); // warm tint
+  }
+
+  // forward frames: tint green/cyan
+  for(let i = 1; i <= onionFwdCount; i++){
+    const idx = refIndex + i;
+    if(idx >= state.frames.length || !state.frames[idx]) continue;
+    const f = state.frames[idx];
+    const img = ensureFrameImage(f);
+    const alpha = 0.45 * (1 - (i-1) / Math.max(1, onionFwdCount));
+    drawThumbInto(ctx, img, alpha, 'rgba(110,230,200,0.16)'); // cool tint
+  }
+}
+let tool='pen', color='#000', size=6, drawing=false, paths=[], undone=[];
+let baseImage = null; // Image object for background when editing an existing frame
+let eraserMode = 'stroke'; // 'stroke' (destination-out strokes) or 'pick' (click to remove a single path / cut area)
+
+// utilities
+function createFrame(img=null){ return { thumb: img || null, desc: '', duration: Number(state.defaultDuration) || 24 }; }
+function safeNumber(v, fallback=0){ const n = Number(v); return Number.isFinite(n) ? n : fallback; }
+function safeString(v){ return (typeof v === 'string') ? v : (v==null?'':String(v)); }
+function normalizeFrames(arr){ if(!Array.isArray(arr)) return []; return arr.map(it => { if(!it) return createFrame(null); if(typeof it === 'string') return createFrame(it); return { thumb: it.thumb || null, desc: safeString(it.desc), duration: Math.max(1, safeNumber(it.duration, state.defaultDuration)) }; }); }
+function ellipsize(s, len){ if(!s) return ''; const st=String(s); return st.length>len?st.slice(0,len-1)+'…':st; }
+function sanitizeFilename(s){ return String(s||'').replace(/[<>:"/\\|?*]+/g,'').slice(0,120); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+
+// --- New helper: word-wrapping for canvas text
+function wrapText(ctx, text, maxLineWidth) {
+  const words = String(text || '').split(/\s+/);
+  const lines = [];
+  let cur = '';
+
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const test = cur ? (cur + ' ' + w) : w;
+    const m = ctx.measureText(test).width;
+    if (m <= maxLineWidth) {
+      cur = test;
+    } else {
+      if (cur) lines.push(cur);
+      if (ctx.measureText(w).width > maxLineWidth) {
+        let part = '';
+        for (const ch of w) {
+          const t = part + ch;
+          if (ctx.measureText(t).width <= maxLineWidth) part = t;
+          else { if (part) lines.push(part); part = ch; }
+        }
+        if (part) cur = part; else cur = '';
+      } else {
+        cur = w;
+      }
+    }
+  }
+  if (cur) lines.push(cur);
+  let maxW = 0;
+  for (const l of lines) maxW = Math.max(maxW, ctx.measureText(l).width);
+  return { lines, maxWidth: maxW };
+}
+
+// list rendering (edit button only for selected frame and smaller)
+function renderList(){ 
+  framesList.innerHTML=''; 
+  state.frames = normalizeFrames(state.frames); 
+
+  // Empty state: jika belum ada frame sama sekali
+  if (!state.frames || state.frames.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.innerHTML = `
+      <div class="small-line">No frames yet</div>
+      <button class="big-btn" id="createFirstFrame">Create New Frame</button>
+      <div class="small-line">Click to draw a new frame or upload an image</div>
+    `;
+    framesList.appendChild(empty);
+
+    // sambungkan tombol besar ke tombol addFrame (pakai existing behavior)
+    const createBtn = document.getElementById('createFirstFrame');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => {
+        // trigger the same action as the existing +New Frame button
+        document.getElementById('addFrame').click();
+      });
+    }
+
+    updateProjectInfo(); 
+    highlightSelected();
+    return;
+  }
+
+  // jika ada frames -> rendering normal (lanjutkan dengan kode semula)
+  state.frames.forEach((f,i)=>{
+    const el=document.createElement('div'); el.className='frame'; el.draggable=true; el.dataset.index=i;
+    const thumbHTML = f.thumb 
+    ? `<img src="${f.thumb}" style="width:100%;height:100%;object-fit:cover"/>` 
+    : 'Empty';
+
+    const showEdit = (i === state.selected);
+    el.innerHTML = `
+    <div class="thumb">${thumbHTML}</div>
+    <div class="meta">
+      <input class="frame-title truncate" type="text" value="${escapeHtml(f.desc)}" placeholder="Desc" />
+      ${showEdit?`<button class="btn small-edit edit-frame" style="margin-top:4px"><i class='bx bx-edit'></i> Edit</button>`:''}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+      <div class="small-muted">${i+1}</div>
+      <div><input class="input duration-field" type="number" min="1" value="${safeNumber(f.duration,state.defaultDuration)}" style="width:64px"/></div>
+    </div>`;
+    framesList.appendChild(el);
+    el.addEventListener('click', (e) => selectFrame(i, e));
+    el.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',i));
+    el.addEventListener('dragover',e=>e.preventDefault());
+    el.addEventListener('drop',e=>{e.preventDefault(); const from=Number(e.dataTransfer.getData('text/plain')); const to=Number(el.dataset.index); reorder(from,to);});
+    const ti = el.querySelector('.frame-title');
+    if (ti) {
+      ti.addEventListener('mousedown', ev => ev.stopPropagation());
+      ti.addEventListener('click', ev => ev.stopPropagation());
+      ti.addEventListener('focus', ev => ev.stopPropagation());
+      ti.addEventListener('input', ev => {
+        state.frames[i].desc = ev.target.value;
+        if (i === state.selected) descInput.value = ev.target.value;
+        saveAuto();
+      });
+    }
+
+    const di = el.querySelector('.duration-field');
+    if (di) {
+      di.addEventListener('mousedown', ev => ev.stopPropagation());
+      di.addEventListener('click', ev => ev.stopPropagation());
+      di.addEventListener('change', ev => {
+        state.frames[i].duration = Math.max(1, Number(ev.target.value) || state.defaultDuration);
+        if (i === state.selected) durationInput.value = state.frames[i].duration;
+        updateProjectInfo();
+        saveAuto();
+      });
+    }
+    const editBtn = el.querySelector('.edit-frame');
+    if(editBtn){
+      editBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        editIndex = i;
+        // reuse cached Image object (ensureFrameImage will create or return frame._img)
+        const img = ensureFrameImage(state.frames[i]);
+        // pass Image to openDraw -> openDraw handles complete/onload
+        openDraw(img);
+      });
+    }
+  }); 
+  updateProjectInfo(); 
+  highlightSelected(); 
+}
+
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function reorder(from,to){ 
+  if(from===to) return; 
+  if(from<0||to<0||from>=state.frames.length||to>state.frames.length) return; 
+  pushHistory(); 
+  const [it] = state.frames.splice(from,1); 
+  state.frames.splice(to,0,it); 
+  renderList(); 
+  selectFrame(Math.min(to,state.frames.length-1)); 
+  saveAuto(); 
+}
+
+function highlightSelected(){
+  Array.from(framesList.children).forEach((el, idx) => {
+    if (selectedFrames.has(idx)) {
+      el.style.border = '2px solid var(--accent)';
+      el.style.backgroundColor = 'rgba(155, 108, 255, 0.15)';
+    } else {
+      el.style.border = '1px solid rgba(255,255,255,0.02)';
+      el.style.backgroundColor = 'transparent';
+    }
+  });
+}
+
+function clampIndex(i){ if(typeof i!=='number' || !Number.isFinite(i)) return -1; if(state.frames.length===0) return -1; return Math.min(Math.max(0,i), state.frames.length-1); }
+
+function selectFrame(i, e = {}) {
+    const isShift = e.shiftKey;
+    const isCtrl = e.ctrlKey || e.metaKey;
+
+    // Handle selection logic
+    if (isShift && selectedFrames.size > 0) {
+        const lastSelected = state.selected;
+        const start = Math.min(lastSelected, i);
+        const end = Math.max(lastSelected, i);
+        selectedFrames.clear();
+        for (let j = start; j <= end; j++) {
+            selectedFrames.add(j);
+        }
+    } else if (isCtrl) {
+        if (selectedFrames.has(i)) {
+            selectedFrames.delete(i);
+        } else {
+            selectedFrames.add(i);
+        }
+    } else {
+        selectedFrames.clear();
+        if (i >= 0) selectedFrames.add(i);
+    }
+
+    state.selected = clampIndex(i); // The last clicked frame is the primary selection
+
+    // Re-render the whole list to update button visibility and highlights
+    renderList(); 
+
+    // Update the side panel inputs
+    if (state.selected === -1) {
+        descInput.value = '';
+        durationInput.value = state.defaultDuration;
+    } else {
+        const f = state.frames[state.selected] || createFrame(null);
+        descInput.value = f.desc || '';
+        durationInput.value = safeNumber(f.duration, state.defaultDuration);
+    }
+    drawPreview();
+}
+
+
+function updateProjectInfo(){ totalFramesEl.textContent = String(state.frames.length); const totalFramesCount = state.frames.reduce((a,b)=>a + safeNumber(b?.duration,0),0); const seconds = Math.floor(totalFramesCount/Math.max(1,state.fps)); projectLength.textContent = seconds+'s'; }
+
+// drawing to canvas helpers
+function drawImageCover(ctx,img,w,h){ const ar = (img.width||1)/(img.height||1); const ar2 = w/h; let sx=0,sy=0,sw=img.width||w,sh=img.height||h; if(ar>ar2){ const nw=(img.height||h)*ar2; sx=((img.width||w)-nw)/2; sw=nw; } else { const nh = (img.width||w)/ar2; sy=((img.height||h)-nh)/2; sh=nh; } try{ ctx.drawImage(img,sx,sy,sw,sh,0,0,w,h); }catch(e){} }
+
+// ----- Replaced drawOverlayCanvas with wrapping-capable version -----
+function drawOverlayCanvas(title, elapsedMs) {
+  const ctx = pctx;
+  ctx.save();
+
+  // Title (top-left)
+  ctx.textBaseline = 'top';
+  ctx.font = 'bold 44px "Impact", "Segoe UI", sans-serif';
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+  ctx.fillStyle = '#ffffff';
+  const tx = 18, ty = 12;
+  ctx.strokeText(title, tx, ty);
+  ctx.fillText(title, tx, ty);
+
+  // Time (bottom-left)
+  const seconds = Math.floor(elapsedMs / 1000);
+  const framesSinceStart = Math.floor(elapsedMs * state.fps / 1000);
+  const frameInSecond = framesSinceStart % state.fps;
+  const timeText = pad2(seconds) + 's + ' + String(frameInSecond).padStart(2,'0') + 'f';
+  ctx.font = 'bold 52px "Segoe UI", sans-serif';
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+  ctx.fillStyle = '#ffffff';
+  const bx = 18, by = preview.height - 100;
+  ctx.strokeText(timeText, bx, by);
+  ctx.fillText(timeText, bx, by);
+
+  // small fps under it
+  const fpsText = 'FPS ' + state.fps;
+  ctx.font = 'bold 28px "Segoe UI", sans-serif';
+  ctx.lineWidth = 8;
+  ctx.strokeText(fpsText, bx, by + 68);
+  ctx.fillText(fpsText, bx, by + 68);
+
+  // Description (bottom-right) - multiline wrapping + auto box sizing
+  const desc = state.frames[state.selected]?.desc || '';
+  if (desc) {
+    ctx.font = '16px "Segoe UI", sans-serif';
+    const pad = 12;
+    const lineHeight = 20; // jarak per baris
+    const maxBoxAllowed = preview.width - 36; // jangan melebihi ini
+    const maxLineWidth = Math.max(120, maxBoxAllowed - pad*2); // lebar teks maksimal per baris
+
+    const wrap = wrapText(ctx, desc, maxLineWidth);
+    const lines = wrap.lines;
+    const textW = wrap.maxWidth;
+
+    const boxW = Math.min(maxBoxAllowed, Math.max(120, textW + pad*2));
+    const boxH = lines.length * lineHeight + pad * 2;
+
+    const rx = preview.width - boxW - 18;
+    const ry = preview.height - boxH - 18;
+
+    // background (semi translucent)
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(rx, ry, boxW, boxH);
+
+    // draw each line
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < lines.length; i++) {
+      const ly = ry + pad + i * lineHeight + 4;
+      ctx.fillText(lines[i], rx + pad, ly);
+    }
+  }
+
+  ctx.restore();
+}
+
+// main preview draw
+function drawPreview(){ pctx.clearRect(0,0,preview.width,preview.height); const sel = state.selected; if(sel<0||!state.frames[sel]){ pctx.fillStyle='#0b0b0b'; pctx.fillRect(0,0,preview.width,preview.height); drawOverlayCanvas('No cut selected',0); return; }
+  const f = state.frames[sel]; if(f.thumb){ const img = new Image(); img.onload = ()=>{ drawImageCover(pctx,img,preview.width,preview.height); // show 0 elapsed for static preview
+      drawGuides(pctx, preview.width, preview.height); drawOverlayCanvas('Cut no. ' + (sel+1), 0); }; img.onerror = ()=>{ pctx.fillStyle='#111'; pctx.fillRect(0,0,preview.width,preview.height); drawOverlayCanvas('Cut no. ' + (sel+1), 0); }; img.src = f.thumb; } else { pctx.fillStyle='#111'; pctx.fillRect(0,0,preview.width,preview.height); drawOverlayCanvas('Cut no. ' + (sel+1), 0); } }
+
+// drawing modal (improved)
+function openDraw(initial = null){
+  drawDialog.classList.add('open');
+
+  // reset drawing state (sesuaikan: keep paths on edit? here it's fresh)
+  paths = []; undone = [];
+  baseImage = null;
+
+  // clear canvas background
+  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  dctx.fillStyle = '#fff';
+  dctx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
+
+  function scheduleRedraw() {
+    // draw after browser paint; fallback in 40ms for rare races
+    requestAnimationFrame(() => {
+      try { redrawPaths(); } catch(e){}
+      setTimeout(() => {
+        try { redrawPaths(); } catch(e){}
+      }, 40);
+    });
+  }
+
+  if (initial instanceof HTMLImageElement) {
+    baseImage = initial;
+    if (baseImage.complete) {
+      scheduleRedraw();
+    } else {
+      baseImage.onload = () => scheduleRedraw();
+    }
+  } else if (typeof initial === 'string' && initial) {
+    // if passed a URL, create image but prefer reuse via ensureFrameImage outside
+    baseImage = new Image();
+    // optional: baseImage.crossOrigin = 'anonymous'; // if remote and CORS allowed
+    baseImage.onload = () => scheduleRedraw();
+    baseImage.src = initial;
+  } else {
+    scheduleRedraw();
+  }
+
+  // focus canvas so keyboard shortcuts work
+  try { drawCanvas.focus(); } catch(e){}
+}
+function closeDraw(){ drawDialog.classList.remove('open'); baseImage = null; }
+
+// toolbar events
+document.querySelectorAll('.canvas-toolbar [data-tool]').forEach(b=>b.addEventListener('click',()=>{ document.querySelectorAll('.canvas-toolbar [data-tool]').forEach(x=>x.classList.remove('active')); b.classList.add('active'); tool=b.dataset.tool; }));
+document.getElementById('colorPicker').addEventListener('input',e=>color=e.target.value);
+document.getElementById('sizeRange').addEventListener('input',e=>size=Number(e.target.value)||6);
+
+// eraser mode toggle button
+const eraserModeBtn = document.getElementById('eraserModeBtn'); eraserModeBtn.addEventListener('click',()=>{ eraserMode = (eraserMode==='stroke') ? 'pick' : 'stroke'; eraserModeBtn.textContent = (eraserMode==='stroke')? 'Stroke' : 'Pick'; });
+
+function hexToRgba(hex) {
+    let c;
+    if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+        c= hex.substring(1).split('');
+        if(c.length== 3){
+            c= [c[0], c[0], c[1], c[1], c[2], c[2]];
+        }
+        c= '0x'+c.join('');
+        return { r: (c>>16)&255, g: (c>>8)&255, b: c&255, a: 255 };
+    }
+    const rgba = hex.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if(rgba){
+      return { r: parseInt(rgba[1]), g: parseInt(rgba[2]), b: parseInt(rgba[3]), a: rgba[4] ? Math.round(parseFloat(rgba[4])*255) : 255 };
+    }
+    return {r:0,g:0,b:0,a:255};
+}
+
+function floodFill(ctx, x, y, fillColor) {
+    const canvas = ctx.canvas;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const { width, height } = canvas;
+    const stack = [[Math.floor(x), Math.floor(y)]];
+    const targetColor = getColorAtPixel(imageData, Math.floor(x), Math.floor(y));
+    const visited = new Uint8Array(width * height);
+
+    if (colorsMatch(targetColor, fillColor)) {
+        return;
+    }
+
+    const tolerance = 32; // color matching tolerance
+
+    while (stack.length) {
+        const [px, py] = stack.pop();
+        if (px < 0 || px >= width || py < 0 || py >= height) {
+            continue;
+        }
+        const offset = py * width + px;
+        if(visited[offset]) continue;
+
+        const currentColor = getColorAtPixel(imageData, px, py);
+        if (colorsMatch(currentColor, targetColor, tolerance)) {
+            setColorAtPixel(imageData, px, py, fillColor);
+            visited[offset] = 1;
+            stack.push([px + 1, py]);
+            stack.push([px - 1, py]);
+            stack.push([px, py + 1]);
+            stack.push([px, py - 1]);
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
+function getColorAtPixel(imageData, x, y) {
+    const { width, data } = imageData;
+    const index = (y * width + x) * 4;
+    return { r: data[index], g: data[index + 1], b: data[index + 2], a: data[index + 3] };
+}
+
+function setColorAtPixel(imageData, x, y, color) {
+    const { width, data } = imageData;
+    const index = (y * width + x) * 4;
+    data[index] = color.r;
+    data[index + 1] = color.g;
+    data[index + 2] = color.b;
+    data[index + 3] = color.a;
+}
+
+function colorsMatch(a, b, tolerance=0) {
+    return Math.abs(a.r - b.r) <= tolerance && Math.abs(a.g - b.g) <= tolerance && Math.abs(a.b - b.b) <= tolerance && Math.abs(a.a - b.a) <= tolerance;
+}
+
+// pointer handlers — enhanced for eraser "pick" mode and baseImage retention
+drawCanvas.addEventListener('pointerdown',async e=>{
+  const p=toLocal(e);
+  if(tool === 'bucket'){
+    paths.push({tool: 'fill', x: p.x, y: p.y, color: color});
+    redrawPaths();
+    return;
+  }
+  if(tool === 'eraser' && eraserMode === 'pick'){
+    // try to hit-test paths (reverse order)
+    for(let i=paths.length-1;i>=0;i--){ const s=paths[i]; if(hitTestPath(s,p,size)){ // remove path
+        undone.push(paths.splice(i,1)[0]); redrawPaths(); return; }
+    }
+    // if no path hit, check baseImage pixel — if opaque then add an eraseCircle path to remove that area from base image visually
+    if(baseImage){ const opaque = await isOpaqueAt(baseImage, p.x, p.y); if(opaque){ paths.push({tool:'eraseBitmapCircle', points:[p], size}); redrawPaths(); return; } }
+    return; // nothing to do for pick if not hitting
+  }
+
+  // default: start a stroke path
+  drawing=true; drawCanvas.setPointerCapture(e.pointerId);
+  const path = {tool, color, size, points:[p]};
+  paths.push(path);
+});
+ 
+// --- Localized Pointer Events for Drawing (Fix for sticky pen bug) ---
+const stopDrawing = (e) => {
+  if (!drawing) return;
+  drawing = false;
+  drawCanvas.releasePointerCapture(e.pointerId);
+  undone = []; // Clear redo stack on new stroke completion
+  redrawPaths();
+};
+
+drawCanvas.addEventListener('pointermove', e => {
+  if (!drawing) return;
+  const p = toLocal(e);
+  const cur = paths[paths.length - 1];
+  if (!cur) return;
+  cur.points.push(p);
+  redrawPaths();
+});
+drawCanvas.addEventListener('pointerup', stopDrawing);
+drawCanvas.addEventListener('pointerleave', stopDrawing); // Stop drawing if pointer leaves canvas
+
+function toLocal(e){ const r=drawCanvas.getBoundingClientRect(); return { x:(e.clientX-r.left)*(drawCanvas.width/r.width||1), y:(e.clientY-r.top)*(drawCanvas.height/r.height||1), pressure: e.pressure }; }
+
+function redrawPaths(){ 
+  dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height); 
+  dctx.fillStyle='#fff'; dctx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
+
+  // determine reference index (use editIndex for edits, or end of list for new frames)
+  const refIndex = (typeof editIndex === 'number' && editIndex !== null) ? editIndex : state.frames.length;
+  // render onion skins under the base/paper
+  renderOnionSkins(dctx, refIndex);
+
+  // draw base image (if any) ON TOP of onion skins so user can see current frame clearly
+  if(baseImage){
+    dctx.save();
+    // When onion skin is on, draw the base image with some transparency
+    // so that the onion skin of the previous frame (if it's the same) can be seen as a tint.
+    if (onionEnabled) {
+      dctx.globalAlpha = 0.65; // Make it semi-transparent
+    }
+    try{ drawImageCover(dctx, baseImage, drawCanvas.width, drawCanvas.height); }catch(e){}
+    dctx.restore();
+  }
+  drawGuides(dctx, drawCanvas.width, drawCanvas.height);
+
+  // then draw all the existing paths (the rest of your existing code for stroke drawing)
+  for(const s of paths){ 
+    if(!s) continue;
+    if(s.tool==='pen'){
+        if(!s.points||s.points.length===0) continue;
+        dctx.save();
+        dctx.globalCompositeOperation = 'source-over';
+        dctx.fillStyle = s.color;
+
+        if (s.points.length > 0) {
+            let lastPoint = s.points[0];
+            let lastRadius = (s.size * (lastPoint.pressure > 0 ? lastPoint.pressure : 0.5)) / 2;
+            
+            for(let i = 1; i < s.points.length; i++) {
+                const currentPoint = s.points[i];
+                const currentRadius = (s.size * (currentPoint.pressure > 0 ? currentPoint.pressure : 0.5)) / 2;
+                const dist = Math.sqrt(Math.pow(currentPoint.x - lastPoint.x, 2) + Math.pow(currentPoint.y - lastPoint.y, 2));
+                const angle = Math.atan2(currentPoint.y - lastPoint.y, currentPoint.x - lastPoint.x);
+                for (let j = 0; j < dist; j+=0.5) { // step by 0.5 for smoother line
+                    const x = lastPoint.x + (Math.cos(angle) * j);
+                    const y = lastPoint.y + (Math.sin(angle) * j);
+                    const radius = lastRadius + (currentRadius - lastRadius) * (j / dist);
+                    dctx.beginPath(); dctx.arc(x, y, Math.max(0.5, radius), 0, Math.PI * 2); dctx.fill();
+                }
+                lastPoint = currentPoint; lastRadius = currentRadius;
+            }
+        }
+        dctx.restore();
+    } else if(s.tool==='eraser'){ 
+        if(!s.points||s.points.length===0) continue;
+        dctx.save(); 
+        dctx.globalCompositeOperation='destination-out'; 
+        dctx.lineWidth=s.size; dctx.beginPath(); 
+        dctx.moveTo(s.points[0].x,s.points[0].y); 
+        for(let i=1;i<s.points.length;i++) dctx.lineTo(s.points[i].x,s.points[i].y); 
+        dctx.stroke(); 
+        dctx.restore(); 
+    }
+    else if(s.tool==='rect' || s.tool==='ellipse'){ 
+        if(!s.points||s.points.length===0) continue;
+        const a=s.points[0], b=s.points[s.points.length-1]; 
+        const x=Math.min(a.x,b.x), y=Math.min(a.y,b.y), w=Math.abs(a.x-b.x), h=Math.abs(a.y-b.y); 
+        dctx.save(); 
+        dctx.globalCompositeOperation = 'source-over'; 
+        dctx.strokeStyle=s.color; 
+        dctx.lineWidth=s.size; 
+        dctx.beginPath(); 
+        if(s.tool==='rect') dctx.rect(x,y,w,h); 
+        else dctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2); 
+        dctx.stroke(); 
+        dctx.restore(); 
+    }
+    else if(s.tool==='eraseBitmapCircle'){
+      if(!s.points||s.points.length===0) continue;
+      dctx.save(); dctx.globalCompositeOperation='destination-out'; dctx.beginPath(); const p=s.points[0]; dctx.arc(p.x,p.y,s.size*1.2,0,Math.PI*2); dctx.fill(); dctx.restore(); 
+    }
+    else if(s.tool==='fill'){
+      const rgbaColor = hexToRgba(s.color);
+      floodFill(dctx, s.x, s.y, rgbaColor);
+    }
+  } 
+}
+
+function hitTestPath(s,p,threshold){ if(!s||!s.points) return false; const th = Math.max(8, threshold||6);
+  if(s.tool==='rect' || s.tool==='ellipse'){ const a=s.points[0], b=s.points[s.points.length-1]; const x=Math.min(a.x,b.x), y=Math.min(a.y,b.y), w=Math.abs(a.x-b.x), h=Math.abs(a.y-b.y); if(s.tool==='rect'){ return (p.x>=x-th && p.x<=x+w+th && p.y>=y-th && p.y<=y+h+th); } else { // ellipse approximate
+      const cx = x + w/2, cy = y + h/2; const rx = Math.max(2,w/2), ry = Math.max(2,h/2); const nx = (p.x-cx)/rx, ny = (p.y-cy)/ry; return (nx*nx + ny*ny) <= 1.4; }
+  }
+  // path stroke: check each segment point distance
+  for(const pt of s.points){ const dx = pt.x - p.x, dy = pt.y - p.y; if(Math.sqrt(dx*dx+dy*dy) <= th + (s.size||0)/2) return true; }
+  return false;
+}
+
+// test pixel opacity on baseImage by drawing to temp canvas
+function isOpaqueAt(img, x, y){ return new Promise(r=>{ const tc = document.createElement('canvas'); tc.width = drawCanvas.width; tc.height = drawCanvas.height; const tctx = tc.getContext('2d'); try{ drawImageCover(tctx, img, tc.width, tc.height); const px = Math.floor(x), py = Math.floor(y); const d = tctx.getImageData(Math.max(0,px), Math.max(0,py), 1, 1).data; r(d[3] > 16); }catch(e){ r(false); } });
+}
+
+// undo / redo / clear
+document.getElementById('undoBtn').addEventListener('click',()=>{ if(paths.length) undone.push(paths.pop()); redrawPaths(); });
+document.getElementById('redoBtn').addEventListener('click',()=>{ if(undone.length) paths.push(undone.pop()); redrawPaths(); });
+document.getElementById('clearBtn').addEventListener('click',()=>{ paths=[];undone=[];redrawPaths(); });
+document.getElementById('cancelDraw').addEventListener('click',()=>{ closeDraw(); });
+document.getElementById('confirmDraw').addEventListener('click',async ()=>{
+  pushHistory();
+  // composite baseImage + paths into final PNG
+  const temp = document.createElement('canvas'); temp.width = drawCanvas.width; temp.height = drawCanvas.height; const tctx = temp.getContext('2d');
+  tctx.fillStyle = '#fff'; tctx.fillRect(0,0,temp.width,temp.height);
+  if(baseImage){ try{ drawImageCover(tctx, baseImage, temp.width, temp.height); }catch(e){} }
+  for(const s of paths){ 
+      if(!s) continue;
+      if(s.tool==='pen'){
+        if(!s.points||s.points.length===0) continue;
+        tctx.save();
+        tctx.globalCompositeOperation = 'source-over';
+        tctx.fillStyle = s.color;
+
+        if (s.points.length > 0) {
+            let lastPoint = s.points[0];
+            let lastRadius = (s.size * (lastPoint.pressure > 0 ? lastPoint.pressure : 0.5)) / 2;
+            
+            for(let i = 1; i < s.points.length; i++) {
+                const currentPoint = s.points[i];
+                const currentRadius = (s.size * (currentPoint.pressure > 0 ? currentPoint.pressure : 0.5)) / 2;
+                const dist = Math.sqrt(Math.pow(currentPoint.x - lastPoint.x, 2) + Math.pow(currentPoint.y - lastPoint.y, 2));
+                const angle = Math.atan2(currentPoint.y - lastPoint.y, currentPoint.x - lastPoint.x);
+                for (let j = 0; j < dist; j+=0.5) { // step by 0.5 for smoother line
+                    const x = lastPoint.x + (Math.cos(angle) * j);
+                    const y = lastPoint.y + (Math.sin(angle) * j);
+                    const radius = lastRadius + (currentRadius - lastRadius) * (j / dist);
+                    tctx.beginPath(); tctx.arc(x, y, Math.max(0.5, radius), 0, Math.PI * 2); tctx.fill();
+                }
+                lastPoint = currentPoint; lastRadius = currentRadius;
+            }
+        }
+        tctx.restore();
+      }
+      else if(s.tool==='eraser'){ 
+          if(!s.points||s.points.length===0) continue;
+          tctx.save(); tctx.globalCompositeOperation='destination-out'; tctx.lineWidth=s.size; tctx.beginPath(); tctx.moveTo(s.points[0].x,s.points[0].x); for(let i=1;i<s.points.length;i++) tctx.lineTo(s.points[i].x,s.points[i].y); tctx.stroke(); tctx.restore(); 
+      }
+      else if(s.tool==='rect' || s.tool==='ellipse'){ 
+          if(!s.points||s.points.length===0) continue;
+          const a=s.points[0], b=s.points[s.points.length-1]; const x=Math.min(a.x,b.x), y=Math.min(a.y,b.y), w=Math.abs(a.x-b.x), h=Math.abs(a.y-b.y); tctx.save(); tctx.globalCompositeOperation = 'source-over'; tctx.strokeStyle=s.color; tctx.lineWidth=s.size; tctx.beginPath(); if(s.tool==='rect') tctx.rect(x,y,w,h); else tctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2); tctx.stroke(); tctx.restore(); 
+      }
+      else if(s.tool==='eraseBitmapCircle'){ 
+          if(!s.points||s.points.length===0) continue;
+          const p=s.points[0]; tctx.save(); tctx.globalCompositeOperation='destination-out'; tctx.beginPath(); tctx.arc(p.x,p.y,s.size*1.2,0,Math.PI*2); tctx.fill(); tctx.restore(); 
+      }
+      else if(s.tool==='fill'){
+        const rgbaColor = hexToRgba(s.color);
+        floodFill(tctx, s.x, s.y, rgbaColor);
+      }
+  }
+  const data = temp.toDataURL('image/png');
+  if(editIndex !== null){ 
+    state.frames[editIndex].thumb = data;
+    selectFrame(editIndex);
+    editIndex = null;
+  } else {
+    state.frames.push({ thumb: data, desc: '', duration: Math.max(1,safeNumber(state.defaultDuration,24)) });
+    selectFrame(state.frames.length-1);
+  }
+  renderList();
+  closeDraw();
+  saveAuto();
+});
+
+// mode and add frame
+const modeToggle = document.getElementById('modeToggle'); modeToggle.addEventListener('click',e=>{ if(e.target.dataset && e.target.dataset.mode){ document.querySelectorAll('#modeToggle button').forEach(b=>b.classList.remove('active')); e.target.classList.add('active'); state.mode = e.target.dataset.mode; } });
+document.getElementById('addFrame').addEventListener('click',()=>{
+  if(state.mode==='draw') { 
+    editIndex = null; // Ensure it's a new frame
+    openDraw(); 
+  } else { 
+    document.getElementById('uploader').click(); 
+  }
+});
+
+// uploader
+const uploader = document.getElementById('uploader'); uploader.addEventListener('change',async(e)=>{
+  const files = Array.from(e.target.files||[]); 
+  if (files.length > 0) pushHistory();
+  for(const f of files){ 
+    const data = await readFileAsDataURL(f); 
+    state.frames.push({ thumb: data, desc: '', duration: Math.max(1,safeNumber(state.defaultDuration,24)) }); 
+  } 
+  renderList(); 
+  selectFrame(state.frames.length-1); 
+  saveAuto(); 
+  uploader.value=''; 
+  scheduleUpdateFrameCache(); // start caching newly added frames
+});
+function readFileAsDataURL(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>res(null); r.readAsDataURL(file);} ); }
+
+// ====================
+// History Stack System
+// ====================
+let history = [];
+let historyIndex = -1;
+
+function pushHistory() {
+    history = history.slice(0, historyIndex + 1);
+    history.push(JSON.stringify(state.frames));
+    historyIndex++;
+}
+
+function undo() {
+    if (historyIndex > 0) {
+        historyIndex--;
+        state.frames = normalizeFrames(JSON.parse(history[historyIndex]));
+        renderList();
+        selectFrame(clampIndex(state.selected));
+    }
+}
+
+function redo() {
+    if (historyIndex < history.length - 1) {
+        historyIndex++;
+        state.frames = normalizeFrames(JSON.parse(history[historyIndex]));
+        renderList();
+        selectFrame(clampIndex(state.selected));
+    }
+}
+
+// =======================================
+// Frame Operations (Copy, Cut, Paste etc)
+// =======================================
+function copyFrames() {
+    if (selectedFrames.size === 0) return;
+    const sortedIndices = [...selectedFrames].sort((a, b) => a - b);
+    clipboardFrames = sortedIndices.map(i => JSON.parse(JSON.stringify(state.frames[i])));
+}
+
+function cutFrames() {
+    if (selectedFrames.size === 0) return;
+    pushHistory();
+    copyFrames();
+    const sortedIndices = [...selectedFrames].sort((a, b) => b - a);
+    for (const index of sortedIndices) {
+        state.frames.splice(index, 1);
+    }
+    selectedFrames.clear();
+    renderList();
+    selectFrame(-1);
+    saveAuto();
+}
+
+function pasteFrames() {
+    if (clipboardFrames.length === 0) return;
+    pushHistory();
+    const insertPos = state.selected >= 0 ? state.selected + 1 : state.frames.length;
+    const copies = clipboardFrames.map(f => JSON.parse(JSON.stringify(f)));
+    state.frames.splice(insertPos, 0, ...copies);
+    selectedFrames.clear();
+    for(let i=0; i<copies.length; i++) {
+        selectedFrames.add(insertPos + i);
+    }
+    state.selected = insertPos + copies.length - 1;
+    renderList();
+    selectFrame(state.selected);
+    saveAuto();
+}
+
+function deleteSelectedFrames() {
+    if (selectedFrames.size === 0) return;
+    pushHistory();
+    const sortedIndices = [...selectedFrames].sort((a, b) => b - a);
+    for (const index of sortedIndices) {
+        state.frames.splice(index, 1);
+    }
+    const newSel = state.frames.length ? Math.max(0, Math.min(sortedIndices[sortedIndices.length-1], state.frames.length - 1)) : -1;
+    selectedFrames.clear();
+    renderList();
+    selectFrame(newSel);
+    saveAuto();
+}
+
+function duplicateSelectedFrames() {
+    if (selectedFrames.size === 0) return;
+    pushHistory();
+    const sortedIndices = [...selectedFrames].sort((a, b) => a - b);
+    const copies = sortedIndices.map(i => JSON.parse(JSON.stringify(state.frames[i])));
+    const insertPos = sortedIndices[sortedIndices.length - 1] + 1;
+    state.frames.splice(insertPos, 0, ...copies);
+    selectedFrames.clear();
+    for(let i=0; i<copies.length; i++) {
+        selectedFrames.add(insertPos + i);
+    }
+    state.selected = insertPos + copies.length - 1;
+    renderList();
+    selectFrame(state.selected);
+    saveAuto();
+}
+
+
+// duplicate / remove buttons
+document.getElementById('duplicateFrame').addEventListener('click', () => duplicateSelectedFrames());
+document.getElementById('removeFrame').addEventListener('click', () => deleteSelectedFrames());
+
+// fps & durations
+fpsInput.addEventListener('change',e=>{ state.fps = Math.max(1, Number(e.target.value)||24); fpsBadge.textContent = state.fps + ' FPS'; saveAuto(); updateProjectInfo(); });
+defaultDurationInput.addEventListener('change',e=>{ state.defaultDuration = Math.max(1, Number(e.target.value)||24); });
+descInput.addEventListener('input',e=>{ if(state.selected>=0 && state.frames[state.selected]){ state.frames[state.selected].desc = e.target.value; renderList(); saveAuto(); } });
+durationInput.addEventListener('change',e=>{ if(state.selected>=0 && state.frames[state.selected]){ state.frames[state.selected].duration = Math.max(1, Number(e.target.value)||state.defaultDuration); renderList(); saveAuto(); } });
+
+// save/load
+function saveAuto(){ try{ const payload = { meta: { fps: state.fps, defaultDuration: state.defaultDuration, title: document.getElementById('projectTitle').value||'' }, frames: state.frames }; localStorage.setItem('ladaboard.autosave', JSON.stringify(payload)); }catch(e){ console.warn('autosave failed',e); } }
+function download(filename, blob){ const a=document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
+document.getElementById('saveProject').addEventListener('click',()=>{ const data = { meta:{ title: document.getElementById('projectTitle').value||'', fps: state.fps, defaultDuration: state.defaultDuration }, frames: state.frames }; const blob = new Blob([JSON.stringify(data, null, 2)],{type:'application/json'}); download((document.getElementById('projectTitle').value||'LadaBoard')+'.json', blob); });
+document.getElementById('loadProject').addEventListener('click',()=>document.getElementById('loadProjectInput').click());
+const loadProjectInput = document.getElementById('loadProjectInput'); loadProjectInput.addEventListener('change',async(e)=>{ const f=e.target.files && e.target.files[0]; if(!f) return; const txt = await f.text(); try{ const data = JSON.parse(txt); state.frames = normalizeFrames(data.frames||[]); state.fps = safeNumber(data.meta?.fps, state.fps); state.defaultDuration = safeNumber(data.meta?.defaultDuration, state.defaultDuration); document.getElementById('projectTitle').value = data.meta?.title || ''; fpsInput.value = state.fps; fpsBadge.textContent = state.fps + ' FPS'; defaultDurationInput.value = state.defaultDuration; renderList(); selectFrame(state.frames.length?0:-1); pushHistory(); saveAuto(); }catch(err){ alert('Invalid project file'); } e.target.value=''; });
+
+// export spread
+document.getElementById('exportSpread').addEventListener('click', async()=>{ if(!state.frames.length) return alert('No frames'); const w=1280,h=720; const spread=document.createElement('canvas'); spread.width=w; spread.height=h*state.frames.length; const ctx=spread.getContext('2d'); ctx.fillStyle='#111'; ctx.fillRect(0,0,spread.width,spread.height); ctx.font='20px sans-serif'; ctx.fillStyle='#fff'; for(let i=0;i<state.frames.length;i++){ const f=state.frames[i]||createFrame(null); const img=new Image(); img.src = f.thumb || blankImageData(w,h); await new Promise(r=>{img.onload=r;img.onerror=r}); const temp=document.createElement('canvas'); temp.width=w; temp.height=h; const tctx=temp.getContext('2d'); tctx.fillStyle='#111'; tctx.fillRect(0,0,w,h); try{ tctx.drawImage(img,0,0,w,h);}catch(e){} ctx.drawImage(temp,0,i*h); ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(8,i*h+8,40,40); ctx.fillStyle='#fff'; ctx.font='16px sans-serif'; ctx.fillText('Bx',20,i*h+34);
+
+  // draw description/title with wrapping
+  ctx.font = '16px sans-serif';
+  const pad = 8;
+  const lineHeight = 18;
+  const maxBoxAllowed = 360; // area reserved (like previous)
+  const maxLineWidth = Math.max(120, maxBoxAllowed - pad*2);
+  const wrap = wrapText(ctx, f.desc || '', maxLineWidth);
+  const lines = wrap.lines;
+  const textW = wrap.maxWidth;
+  const boxW = Math.min(maxBoxAllowed, Math.max(120, textW + pad*2));
+  const boxH = Math.max(28, lines.length * lineHeight + pad*2);
+  const rx = 56;
+  const ry = i*h + 16;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(rx, ry, boxW, boxH);
+  ctx.fillStyle = '#fff';
+  for (let li = 0; li < lines.length; li++) {
+    ctx.fillText(lines[li], rx + pad, ry + pad + li * lineHeight + 2);
+  }
+} const blob = await new Promise(r=>spread.toBlob(r,'image/png')); download(sanitizeFilename((document.getElementById('projectTitle').value||'spread'))+'.png', blob); });
+
+function blankImageData(w,h){ const c=document.createElement('canvas'); c.width=w;c.height=h; const cx=c.getContext('2d'); cx.fillStyle='#222'; cx.fillRect(0,0,w,h); return c.toDataURL('image/png'); }
+
+// ---------- Safe export binding (no console logs) ----------
+(function attachExportBinding(){
+  const btn = document.getElementById('exportVideo');
+  if (!btn) return;
+  async function handleExportClick() {
+    try {
+      btn.disabled = true;
+      btn.innerHTML = "&lt;i class='bx bx-film'&gt;&lt;/i&gt; Exporting...";
+      await exportVideo(); // call the main export function (below)
+    } catch (err) {
+      alert('Export failed: ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "&lt;i class='bx bx-film'&gt;&lt;/i&gt; Export Video";
+    }
+  }
+  // remove existing listeners safely (if any) and attach
+  btn.replaceWith(btn.cloneNode(true));
+  const newBtn = document.getElementById('exportVideo');
+  newBtn.addEventListener('click', handleExportClick);
+})();
+
+// ---------- Helpers for export (no console logs) ----------
+function chooseSupportedMime() {
+  const options = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm'
+  ];
+  for (const m of options) {
+    try { if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m; } catch(e) {}
+  }
+  return 'video/webm';
+}
+function waitMs(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+function drawOverlayForExport(ctx, elapsedMs, frameIndex, w, h, fps, desc) {
+  ctx.save();
+  // Cut no. (top-left)
+  ctx.textBaseline = 'top';
+  ctx.font = 'bold 36px "Segoe UI", sans-serif';
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+  ctx.fillStyle = '#ffffff';
+  const tx = 16, ty = 10;
+  ctx.strokeText('Cut no. ' + (frameIndex + 1), tx, ty);
+  ctx.fillText('Cut no. ' + (frameIndex + 1), tx, ty);
+
+  // Time (bottom-left)
+  const seconds = Math.floor(elapsedMs / 1000);
+  const framesSinceStart = Math.floor(elapsedMs * fps / 1000);
+  const frameInSecond = framesSinceStart % fps;
+  const timeText = String(seconds).padStart(2,'0') + 's +' + String(frameInSecond).padStart(2,'0') + 'f';
+  ctx.font = 'bold 40px "Segoe UI", sans-serif';
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+  ctx.fillStyle = '#ffffff';
+  const bx = 16, by = h - 110;
+  ctx.strokeText(timeText, bx, by);
+  ctx.fillText(timeText, bx, by);
+
+  // small fps under it
+  const fpsText = 'FPS ' + fps;
+  ctx.font = 'bold 22px "Segoe UI", sans-serif';
+  ctx.lineWidth = 6;
+  ctx.strokeText(fpsText, bx, by + 56);
+  ctx.fillText(fpsText, bx, by + 56);
+
+  // Description (bottom-right) using wrapText already in your code
+  if (desc) {
+    ctx.font = '16px "Segoe UI", sans-serif';
+    const pad = 12;
+    const lineHeight = 20;
+    const maxBoxAllowed = w - 36;
+    const maxLineWidth = Math.max(120, maxBoxAllowed - pad * 2);
+    const wrap = wrapText(ctx, desc, maxLineWidth);
+    const lines = wrap.lines;
+    const textW = wrap.maxWidth;
+    const boxW = Math.min(maxBoxAllowed, Math.max(120, textW + pad * 2));
+    const boxH = lines.length * lineHeight + pad * 2;
+    const rx = w - boxW - 18;
+    const ry = h - boxH - 12;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(rx, ry, boxW, boxH);
+
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < lines.length; i++) {
+      const ly = ry + pad + i * lineHeight + 4;
+      ctx.fillText(lines[i], rx + pad, ly);
+    }
+  }
+  ctx.restore();
+}
+
+// ---------- Robust exportVideo (no console logs) ----------
+async function exportVideo(){
+  if (!state.frames.length) { alert('No frames'); return; }
+
+  const w = preview.width || 1280;
+  const h = preview.height || 720;
+  const rec = document.createElement('canvas');
+  rec.width = w; rec.height = h;
+  const ctx = rec.getContext('2d');
+
+  // create MediaRecorder safely
+  let recorder;
+  const chunks = [];
+  const mime = chooseSupportedMime();
+  try {
+    const stream = rec.captureStream(Math.max(1, state.fps || 24));
+    recorder = new MediaRecorder(stream, { mimeType: mime });
+  } catch (err) {
+    throw new Error('MediaRecorder not available or mime not supported on this browser.');
+  }
+
+  recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+
+  const stopped = new Promise(resolve => recorder.onstop = resolve);
+  try { recorder.start(1000); } catch (err) { try { recorder.start(); } catch(e) { throw new Error('Recorder failed to start.'); } } // Fallback to start() without timeslice
+
+  // record frames
+  let cumulativeMs = 0;
+  const frameMs = 1000 / Math.max(1, state.fps || 24);
+
+  for (let i = 0; i < state.frames.length; i++) {
+    const f = state.frames[i] || createFrame(null);
+    const img = new Image();
+    // set crossOrigin to avoid taint if possible
+    try { img.crossOrigin = 'anonymous'; } catch(e) {}
+    img.src = f.thumb || blankImageData(w,h);
+    await new Promise(r => { img.onload = r; img.onerror = r; });
+
+    const framesToShow = Math.max(1, Math.round(safeNumber(f.duration, state.defaultDuration)));
+    for (let ff = 0; ff < framesToShow; ff++) {
+      ctx.clearRect(0,0,w,h);
+      try { drawImageCover(ctx, img, w, h); } catch(e){}
+      try { drawGuides(ctx, w, h); } catch(e){}        // &lt;-- draw guides into exported frame
+      drawOverlayForExport(ctx, cumulativeMs, i, w, h, state.fps || 24, f.desc || '');
+      await waitMs(Math.round(frameMs));
+      cumulativeMs += frameMs;
+    }
+  }
+
+  recorder.stop();
+  await stopped;
+
+  if (!chunks.length) {
+    throw new Error('No video data captured. Try using Chrome/Edge and ensure images are uploaded (not cross-origin blocked).');
+  }
+
+  const blob = new Blob(chunks, { type: mime });
+  download(sanitizeFilename((document.getElementById('projectTitle').value || 'storyboard')) + '.webm', blob);
+}
+// playback engine (unchanged)
+let playing = false;
+let playStartTime = 0;
+let pausedTime = 0;
+let rafId = null;
+let currentFrameIndex = -1;
+const playBtn = document.getElementById('playAll');
+
+function findFrameIndex(elapsedMs) {
+    const elapsedFrames = elapsedMs * state.fps / 1000;
+    let framesSoFar = 0;
+    for (let i = 0; i < state.frames.length; i++) {
+        framesSoFar += state.frames[i].duration;
+        if (elapsedFrames < framesSoFar) {
+            return i;
+        }
+    }
+    return -1; // end of playback
+}
+
+function getElapsedInFrame(elapsedMs, frameIndex) {
+    const elapsedFrames = elapsedMs * state.fps / 1000;
+    let framesBefore = 0;
+    for (let i = 0; i < frameIndex; i++) {
+        framesBefore += state.frames[i].duration;
+    }
+    const elapsedInFrame = elapsedFrames - framesBefore;
+    return elapsedInFrame * 1000 / state.fps;
+}
+
+
+function playbackLoop() {
+    if (!playing) return;
+
+    const elapsed = pausedTime + (performance.now() - playStartTime);
+    const frameIdx = findFrameIndex(elapsed);
+
+    if (frameIdx === -1) {
+        stopPlayback();
+        return;
+    }
+
+    if (frameIdx !== currentFrameIndex) {
+        currentFrameIndex = frameIdx;
+        selectFrame(currentFrameIndex);
+    }
+    
+    const f = state.frames[currentFrameIndex];
+    if (!f) {
+        stopPlayback();
+        return;
+    }
+
+    const elapsedForCut = getElapsedInFrame(elapsed, currentFrameIndex);
+
+    const img = new Image();
+    img.onload = () => {
+        pctx.clearRect(0, 0, preview.width, preview.height);
+        try {
+          pctx.drawImage(img, 0, 0, preview.width, preview.height);
+        } catch (e) {}
+        // --- tambahkan guides di preview saat playback ---
+        try { drawGuides(pctx, preview.width, preview.height); } catch(e) {}
+        // overlay (time/title/desc)
+        drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
+        rafId = requestAnimationFrame(playbackLoop);
+    };
+    img.onerror = () => {
+        pctx.clearRect(0, 0, preview.width, preview.height);
+        pctx.fillStyle = '#111';
+        pctx.fillRect(0, 0, preview.width, preview.height);
+        drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
+        rafId = requestAnimationFrame(playbackLoop);
+    };
+    img.src = f.thumb || blankImageData(preview.width, preview.height);
+}
+
+function startPlayback() {
+    if (playing || !state.frames.length) return;
+    playing = true;
+    playBtn.innerHTML = "<i class='bx bx-pause'></i> Stop";
+    playStartTime = performance.now();
+    if (pausedTime === 0) {
+        currentFrameIndex = -1;
+    }
+    playbackLoop();
+}
+
+function pausePlayback() {
+    if (!playing) return;
+    playing = false;
+    cancelAnimationFrame(rafId);
+    pausedTime += performance.now() - playStartTime;
+    playBtn.innerHTML = "<i class='bx bx-play'></i> Play";
+}
+
+function stopPlayback() {
+    playing = false;
+    cancelAnimationFrame(rafId);
+    pausedTime = 0;
+    currentFrameIndex = -1;
+    playBtn.innerHTML = "<i class='bx bx-play'></i> Play";
+    drawPreview();
+}
+
+function togglePlayback() {
+    if (playing) {
+        pausePlayback();
+    } else {
+        const totalDuration = state.frames.reduce((acc, f) => acc + f.duration, 0) * 1000 / state.fps;
+        if (pausedTime >= totalDuration) {
+            stopPlayback(); // if at the end, reset and play from start
+            startPlayback();
+        } else {
+            startPlayback();
+        }
+    }
+}
+
+playBtn.addEventListener('click', togglePlayback);
+
+
+// ====================
+// Keyboard Shortcuts
+// ====================
+window.addEventListener('keydown', e => {
+  // --- Shortcuts for Drawing Modal ---
+  if (drawDialog.classList.contains('open')) {
+    // Ctrl+Z for undo inside the modal
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      document.getElementById('undoBtn').click();
+      return;
+    }
+    // Ctrl+Y for redo inside the modal
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      document.getElementById('redoBtn').click();
+      return;
+    }
+    // Enter to confirm
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('confirmDraw').click();
+      return;
+    }
+    // Escape to cancel
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      document.getElementById('cancelDraw').click();
+      return;
+    }
+  }
+
+  const target = e.target || document.activeElement;
+  const isInputting = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+
+  // Global shortcuts that work even when typing
+  if (e.ctrlKey || e.metaKey) {
+    switch(e.key.toLowerCase()) {
+        case 'z': e.preventDefault(); undo(); return;
+        case 'y': e.preventDefault(); redo(); return;
+        case 's': e.preventDefault(); document.getElementById('saveProject').click(); return;
+        case 'c': e.preventDefault(); copyFrames(); return;
+        case 'x': e.preventDefault(); cutFrames(); return;
+        case 'v': e.preventDefault(); pasteFrames(); return;
+    }
+  }
+
+  // Handle Enter key separately for playback vs. newline
+  if (e.key === 'Enter') {
+    if (isInputting && e.shiftKey && target.id === 'descInput') {
+      return; // Allow newline in textarea
+    }
+    e.preventDefault();
+    togglePlayback();
+    return;
+  }
+
+  // Stop other shortcuts if user is typing
+  if (isInputting || e.isComposing) return;
+
+  // Shortcuts that should NOT work while inputting
+  switch(e.key.toLowerCase()) {
+    case 'arrowright':
+      e.preventDefault();
+      selectFrame(clampIndex(state.selected + 1));
+      break;
+    case 'arrowleft':
+      e.preventDefault();
+      selectFrame(clampIndex(state.selected - 1));
+      break;
+    case 'd':
+      if (e.shiftKey) {
+        e.preventDefault();
+        duplicateSelectedFrames();
+      }
+      break;
+    case 'delete':
+    case 'backspace':
+      e.preventDefault();
+      deleteSelectedFrames();
+      break;
+  }
+});
+
+// load autosave on startup
+window.addEventListener('load',()=>{
+  try { 
+    const data = localStorage.getItem('ladaboard.autosave'); 
+    if(data){ 
+      const p = JSON.parse(data); 
+      state.frames = normalizeFrames(p.frames||[]); 
+      state.fps = safeNumber(p.meta?.fps,state.fps); 
+      state.defaultDuration = safeNumber(p.meta?.defaultDuration,state.defaultDuration); 
+      document.getElementById('projectTitle').value = p.meta?.title||''; 
+      fpsInput.value = state.fps; 
+      fpsBadge.textContent = state.fps + ' FPS'; 
+      defaultDurationInput.value = state.defaultDuration; 
+      renderList(); 
+      selectFrame(state.frames.length?0:-1); 
+    } 
+  } catch(e) { 
+    console.warn('failed to load autosave',e); 
+  } 
+  pushHistory(); // Create initial history entry
+  preview.width=1280; 
+  preview.height=720; 
+  drawPreview(); 
+});
+
+// helpers for renderList
+function escapeHtmlSimple(s){ return escapeHtml(s); }
+framesList.addEventListener('click',()=>setTimeout(drawPreview,50));
+</script>
+</body>
+</html>
