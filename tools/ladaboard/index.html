@@ -3536,8 +3536,11 @@ function requestCanvasRedrawWithInsertOverlay() {
   // Repaint base and insert overlay
   redrawPaths();
   if (insertImage) {
-    // redrawPaths clears and draws base, then we overlay the transform image+handles
-    drawTransformedImage(dctx);
+    // draw overlay (image + blue handles) on insertCanvas, not the main canvas
+    drawTransformedImageOverlay();
+  } else {
+    // ensure overlay is cleared if not active
+    ictx.clearRect(0,0,insertCanvas.width, insertCanvas.height);
   }
 }
 
@@ -3578,7 +3581,7 @@ applyImageBtn?.addEventListener('click', ()=>{
   saveCanvasState();
   // draw current transformed image directly onto base canvas (no handles)
   drawTransformedImageOnly(dctx);
-  // clear overlay state
+  // clear overlay state and ensure no blue handles get baked
   insertImage = null;
   ictx.clearRect(0,0,insertCanvas.width, insertCanvas.height);
   applyImageBtn.style.display = 'none';
@@ -3586,6 +3589,8 @@ applyImageBtn?.addEventListener('click', ()=>{
   prevToolForInsert = null;
   // save state after applying
   saveCanvasState();
+  // repaint base to reflect applied image, overlays cleared
+  redrawPaths();
 });
 
 // also cleanup on cancel/close
@@ -3600,67 +3605,70 @@ if (cancelBtn) cancelBtn.addEventListener('click', ()=>{
 // augment pointer interactions when insert is active
 (function attachInsertPointerHandlers(){
   drawCanvas.addEventListener('pointerdown', (e)=>{
-    if (!insertImage) return; // let default tools handle
-    const p = screenToCanvasPoint(e);
-    const hit = hitHandle(p);
-    if (!hit) return;
-    e.preventDefault();
-    insertTransform.dragging = true;
-    insertTransform.dragMode = hit.mode;
-    insertTransform.dragModeCorner = hit.corner || null;
-    insertTransform.startPointer = p;
-    insertTransform.startState = JSON.parse(JSON.stringify(insertTransform));
-    drawCanvas.setPointerCapture(e.pointerId);
-  });
+  if (!insertImage) return; // let default tools handle
+  const p = screenToCanvasPoint(e);
+  const hit = hitHandle(p);
+  if (!hit) return;
+  e.preventDefault();
+  insertTransform.dragging = true;
+  insertTransform.dragMode = hit.mode;
+  insertTransform.dragModeCorner = hit.corner || null;
+  insertTransform.startPointer = p;
+  insertTransform.startState = JSON.parse(JSON.stringify(insertTransform));
+  drawCanvas.setPointerCapture(e.pointerId);
+});
 
-  drawCanvas.addEventListener('pointermove', (e)=>{
-    if (!insertImage || !insertTransform.dragging) return;
-    const p = screenToCanvasPoint(e);
-    const dx = p.x - insertTransform.startPointer.x;
-    const dy = p.y - insertTransform.startPointer.y;
-    const s = insertTransform.startState;
-    switch (insertTransform.dragMode) {
-      case 'move':
-        insertTransform.x = s.x + dx;
-        insertTransform.y = s.y + dy;
-        break;
-      case 'scale': {
-        const corner = insertTransform.dragModeCorner || 'br';
-        const signX = (corner === 'tr' || corner === 'br') ? 1 : -1;
-        const signY = (corner === 'bl' || corner === 'br') ? 1 : -1;
-        let factorX = 1 + (dx * signX) / 300;
-        let factorY = 1 + (dy * signY) / 300;
-        if (e.shiftKey) {
-          const delta = Math.abs(dx) > Math.abs(dy) ? dx * signX : dy * signY;
-          const f = 1 + delta / 300;
-          factorX = f; factorY = f;
-        }
-        insertTransform.scaleX = Math.max(0.05, s.scaleX * factorX);
-        insertTransform.scaleY = Math.max(0.05, s.scaleY * factorY);
-        break;
+// Keep overlay drawing strictly on insertCanvas
+ictx && drawTransformedImageOverlay && drawTransformedImageOverlay();
+
+drawCanvas.addEventListener('pointermove', (e)=>{
+  if (!insertImage || !insertTransform.dragging) return;
+  const p = screenToCanvasPoint(e);
+  const dx = p.x - insertTransform.startPointer.x;
+  const dy = p.y - insertTransform.startPointer.y;
+  const s = insertTransform.startState;
+  switch (insertTransform.dragMode) {
+    case 'move':
+      insertTransform.x = s.x + dx;
+      insertTransform.y = s.y + dy;
+      break;
+    case 'scale': {
+      const corner = insertTransform.dragModeCorner || 'br';
+      const signX = (corner === 'tr' || corner === 'br') ? 1 : -1;
+      const signY = (corner === 'bl' || corner === 'br') ? 1 : -1;
+      let factorX = 1 + (dx * signX) / 300;
+      let factorY = 1 + (dy * signY) / 300;
+      if (e.shiftKey) {
+        const delta = Math.abs(dx) > Math.abs(dy) ? dx * signX : dy * signY;
+        const f = 1 + delta / 300;
+        factorX = f; factorY = f;
       }
-      case 'rotate': {
-        const angle0 = Math.atan2(insertTransform.startPointer.y - s.y, insertTransform.startPointer.x - s.x);
-        let angle1 = Math.atan2(p.y - s.y, p.x - s.x);
-        let newAngle = s.rotation + (angle1 - angle0);
-        if (e.shiftKey) {
-          const step = Math.PI / 12; // 15°
-          newAngle = Math.round(newAngle / step) * step;
-        }
-        insertTransform.rotation = newAngle;
-        break;
-      }
-      case 'skewX': {
-        insertTransform.skewX = s.skewX + dx / 300;
-        break;
-      }
-      case 'skewY': {
-        insertTransform.skewY = s.skewY + dy / 300;
-        break;
-      }
+      insertTransform.scaleX = Math.max(0.05, s.scaleX * factorX);
+      insertTransform.scaleY = Math.max(0.05, s.scaleY * factorY);
+      break;
     }
-    requestCanvasRedrawWithInsertOverlay();
-  });
+    case 'rotate': {
+      const angle0 = Math.atan2(insertTransform.startPointer.y - s.y, insertTransform.startPointer.x - s.x);
+      let angle1 = Math.atan2(p.y - s.y, p.x - s.x);
+      let newAngle = s.rotation + (angle1 - angle0);
+      if (e.shiftKey) {
+        const step = Math.PI / 12; // 15°
+        newAngle = Math.round(newAngle / step) * step;
+      }
+      insertTransform.rotation = newAngle;
+      break;
+    }
+    case 'skewX': {
+      insertTransform.skewX = s.skewX + dx / 300;
+      break;
+    }
+    case 'skewY': {
+      insertTransform.skewY = s.skewY + dy / 300;
+      break;
+    }
+  }
+  requestCanvasRedrawWithInsertOverlay();
+});
 
   const stop = (e)=>{
     if (!insertImage) return;
