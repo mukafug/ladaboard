@@ -531,6 +531,8 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
       <div class="canvas-area" style="position:relative; display:inline-block;">
         <canvas id="drawCanvas" width="1024" height="576" style="background:#fff; border-radius:6px;"></canvas>
         <canvas id="onionCanvas" width="1024" height="576" style="position:absolute; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
+        
+        <canvas id="guideCanvas" width="1024" height="576" style="position:absolute; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;padding:8px">
@@ -696,6 +698,11 @@ const drawCanvas = document.getElementById('drawCanvas');
 const dctx = drawCanvas.getContext('2d');
 const onionCanvas = document.getElementById('onionCanvas');
 const octx = onionCanvas.getContext('2d');
+
+// TAMBAHKAN DUA BARIS DI BAWAH INI
+const guideCanvas = document.getElementById('guideCanvas');
+const gctx = guideCanvas.getContext('2d');
+
 // Main drawing canvas - everything will be drawn here as bitmap
 let drawingHistory = []; // Array of canvas states for undo/redo
 let currentHistoryIndex = -1;
@@ -1732,6 +1739,12 @@ function openDraw(initial = null){
   // Clear onion skin overlay saat modal dibuka
   octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
   
+  // Pastikan ukuran semua kanvas overlay sama
+  onionCanvas.width = drawCanvas.width;
+  onionCanvas.height = drawCanvas.height;
+  guideCanvas.width = drawCanvas.width;
+  guideCanvas.height = drawCanvas.height;
+  
   // Initialize new bitmap drawing system
   initDrawingCanvas();
 
@@ -1778,8 +1791,9 @@ function openDraw(initial = null){
 function closeDraw(){ 
   drawDialog.classList.remove('open'); 
   baseImage = null; 
-  // Clear onion skin overlay saat modal ditutup
+  // Clear onion skin dan guide overlay saat modal ditutup
   octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
+  gctx.clearRect(0, 0, guideCanvas.width, guideCanvas.height); // <-- Baris baru
 }
 
 // toolbar events
@@ -2036,30 +2050,28 @@ drawCanvas.addEventListener('pointerleave', stopDrawing); // Stop drawing if poi
 function toLocal(e){ const r=drawCanvas.getBoundingClientRect(); return { x:(e.clientX-r.left)*(drawCanvas.width/r.width||1), y:(e.clientY-r.top)*(drawCanvas.height/r.height||1), pressure: e.pressure }; }
 
 function redrawPaths(){ 
-  // Clear the canvas
+  // 1. Gambar utama di dctx (drawCanvas)
   dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height); 
   dctx.fillStyle='#fff'; 
   dctx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
 
-  // determine reference index (use editIndex for edits, or end of list for new frames)
-  const refIndex = (typeof editIndex === 'number' && editIndex !== null) ? editIndex : state.frames.length;
-  
-  // draw base image (if any)
   if(baseImage){
     dctx.save();
     try{ drawImageCover(dctx, baseImage, drawCanvas.width, drawCanvas.height); }catch(e){}
     dctx.restore();
   }
-  
-  // HAPUS ATAU BERI KOMENTAR PADA BARIS INI
-  // drawGuides(dctx, drawCanvas.width, drawCanvas.height);
-  
-  // Render onion skin overlay di canvas terpisah
+
+  // 2. Gambar Onion Skin di octx (onionCanvas)
+  const refIndex = (typeof editIndex === 'number' && editIndex !== null) ? editIndex : state.frames.length;
   if (drawDialog.classList.contains('open')) {
     renderOnionSkinsOverlay(refIndex);
   } else {
     octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
   }
+
+  // 3. Gambar Guides di gctx (guideCanvas) - INI PERUBAHAN UTAMA
+  gctx.clearRect(0, 0, guideCanvas.width, guideCanvas.height); // Bersihkan kanvas panduan
+  drawGuides(gctx, guideCanvas.width, guideCanvas.height);    // Gambar panduan di atasnya
 }
 
 function hitTestPath(s,p,threshold){ if(!s||!s.points) return false; const th = Math.max(8, threshold||6);
