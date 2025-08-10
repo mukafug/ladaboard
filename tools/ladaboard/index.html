@@ -450,6 +450,34 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
 }
 /* -------- End Responsive Enhancements -------- */
 
+
+/* Mobile-specific dropdown layout fixes */
+@media (max-width: 1024px) {
+  .dropdown { position: static; }
+  .dropdown-menu {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: 72px;
+    min-width: unset;
+    max-height: 60vh;
+    overflow-y: auto;
+    z-index: 1900;
+    padding: 8px;
+    border-radius: 12px;
+  }
+  /* Stack submenu content below parent on mobile */
+  .submenu-menu {
+    position: static;
+    display: none;
+    min-width: 100%;
+    box-shadow: none;
+    margin-top: 6px;
+  }
+  .submenu.open .submenu-menu { display: block; }
+  .dropdown-menu .btn { padding: 10px 12px; }
+}
+
 </style>
 </head>
 <body>
@@ -830,6 +858,45 @@ if (fileMenuBtn) {
   // reset submenu state when switching back to desktop
   window.addEventListener('resize', ()=>{ if (window.innerWidth > 1024) closeAllSubmenus(); });
 }
+
+// Mobile submenu toggle handling
+(function setupMobileSubmenu(){
+  const isMobile = () => window.innerWidth <= 1024;
+  const submenuRoots = document.querySelectorAll('#fileMenu .submenu');
+  submenuRoots.forEach(root => {
+    const toggleBtn = root.querySelector('.submenu-toggle');
+    if (!toggleBtn) return;
+    toggleBtn.addEventListener('click', (ev) => {
+      // On mobile, toggle inline submenu instead of hover
+      if (isMobile()) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        root.classList.toggle('open');
+      }
+    });
+  });
+
+  // Prevent dropdown from closing when clicking inside menu on mobile
+  const fileMenu = document.getElementById('fileMenu');
+  if (fileMenu) {
+    fileMenu.addEventListener('click', (ev) => {
+      if (isMobile()) ev.stopPropagation();
+    });
+  }
+
+  // Close submenus when dropdown itself closes
+  document.addEventListener('click', () => {
+    if (!isMobile()) return;
+    document.querySelectorAll('#fileMenu .submenu.open').forEach(el => el.classList.remove('open'));
+  });
+
+  // Also close on Escape
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('#fileMenu .submenu.open').forEach(el => el.classList.remove('open'));
+    }
+  });
+})();
 
 // drawing modal elements
 const drawDialog = document.getElementById('drawDialog'); 
