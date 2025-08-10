@@ -3304,11 +3304,12 @@ function hitHandle(p) {
 }
 
 function requestCanvasRedrawWithInsertOverlay() {
-  // Repaint base and insert overlay
+  // Repaint base and overlay only (do not bake handles into base)
   redrawPaths();
   if (insertImage) {
-    // redrawPaths clears and draws base, then we overlay the transform image+handles
-    drawTransformedImage(dctx);
+    drawTransformedImageOverlay();
+  } else {
+    ictx.clearRect(0,0,insertCanvas.width, insertCanvas.height);
   }
 }
 
@@ -3347,6 +3348,8 @@ applyImageBtn?.addEventListener('click', ()=>{
   if (!insertImage) return;
   // permanently draw transformed image onto drawCanvas and push to history
   saveCanvasState();
+  // clear overlay first so no handles remain on top during commit
+  ictx.clearRect(0,0,insertCanvas.width, insertCanvas.height);
   // draw current transformed image directly onto base canvas (no handles)
   drawTransformedImageOnly(dctx);
   // clear overlay state
