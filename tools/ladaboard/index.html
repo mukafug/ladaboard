@@ -478,9 +478,28 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
   .dropdown-menu .btn { padding: 10px 12px; }
 }
 
+/* Export loading modal */
+.loading-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:2200}
+.loading-backdrop.open{display:flex}
+.loading-card{background:var(--panel);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:18px 22px;min-width:260px;box-shadow:0 20px 60px rgba(0,0,0,0.7);display:flex;gap:12px;align-items:center}
+.loading-spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,0.15);border-top-color:var(--accent);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{display:flex;flex-direction:column}
+.loading-title{font-weight:700}
+.loading-sub{color:var(--muted);font-size:12px}
+
 </style>
 </head>
 <body>
+<div class="loading-backdrop" id="exportLoading">
+  <div class="loading-card">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">
+      <div class="loading-title" id="exportLoadingTitle">Exporting...</div>
+      <div class="loading-sub" id="exportLoadingSub">Please wait</div>
+    </div>
+  </div>
+  </div>
 <div class="app">
   <div class="sidebar">
     <div class="header">
@@ -537,7 +556,17 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
             </div>
           </div>
 
-          <button class="btn" id="exportVideo"><i class='bx bx-film'></i> Export Video</button>
+          <!-- Submenu Export Video -->
+          <div class="submenu">
+            <button class="btn submenu-toggle">
+              <i class='bx bx-film'></i> Export Video
+              <i class='bx bx-chevron-right' style="margin-left:auto;"></i>
+            </button>
+            <div class="submenu-menu">
+              <button class="btn" id="exportVideoMp4">MP4</button>
+              <button class="btn" id="exportVideoWebm">WEBM</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="row"><label class="small-muted">FPS</label><input id="fpsInput" class="input" type="number" value="24" min="1" max="60" style="width:80px" autocomplete="off" /></div>
@@ -804,6 +833,21 @@ const descInput = document.getElementById('descInput'); const durationSecInput =
 const fileDropdownEl = document.getElementById('fileDropdown');
 const fileMenuBtn = document.getElementById('fileMenuBtn');
 const fileMenu = document.getElementById('fileMenu');
+
+// ensure export submenu works on mobile
+(function fixExportSubmenuMobile(){
+  const isMobile = () => window.innerWidth <= 1024;
+  const roots = document.querySelectorAll('#fileMenu .submenu');
+  roots.forEach(root=>{
+    const toggle = root.querySelector('.submenu-toggle');
+    toggle?.addEventListener('click',(e)=>{
+      if (!isMobile()) return;
+      e.preventDefault(); e.stopPropagation();
+      roots.forEach(r=>{ if(r!==root) r.classList.remove('open'); });
+      root.classList.toggle('open');
+    });
+  });
+})();
 function closeAllSubmenus(){
   try {
     if (!fileDropdownEl) return;
@@ -1919,13 +1963,20 @@ function drawPreview(){
     return; 
   }
   const f = state.frames[sel]; 
+  const cached = frameCache[sel]?.bmp;
+  if(cached){
+    try { drawImageCover(pctx, cached, preview.width, preview.height); } catch(e){}
+    drawGuides(pctx, preview.width, preview.height);
+    drawOverlayCanvas('Cut no. ' + (sel+1), 0);
+    return;
+  }
   if(f.thumb){ 
     const img = new Image(); 
     img.onload = ()=>{
       drawImageCover(pctx,img,preview.width,preview.height); 
-      // Tambahkan guides untuk mode Upload juga
       drawGuides(pctx, preview.width, preview.height);
       drawOverlayCanvas('Cut no. ' + (sel+1), 0); 
+      scheduleUpdateFrameCache(50);
     }; 
     img.onerror = ()=>{ 
       pctx.fillStyle='#111'; 
@@ -2758,26 +2809,24 @@ document.getElementById('exportSpreadPdf').addEventListener('click', async () =>
 
 function blankImageData(w,h){ const c=document.createElement('canvas'); c.width=w;c.height=h; const cx=c.getContext('2d'); cx.fillStyle='#222'; cx.fillRect(0,0,w,h); return c.toDataURL('image/png'); }
 
-// ---------- Safe export binding (no console logs) ----------
-(function attachExportBinding(){
-  const btn = document.getElementById('exportVideo');
-  if (!btn) return;
-  async function handleExportClick() {
-    try {
-      btn.disabled = true;
-      btn.innerHTML = "<i class='bx bx-film'></i> Exporting...";
-      await exportVideo(); // Kembali menggunakan fungsi ekspor webm sederhana
-    } catch (err) {
-      alert('Export failed: ' + (err && err.message ? err.message : String(err)));
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = "<i class='bx bx-film'></i> Export Video";
-    }
+// ---------- Export menu bindings (WEBM/MP4) ----------
+(function attachExportBindings(){
+  const webmBtn = document.getElementById('exportVideoWebm');
+  const mp4Btn = document.getElementById('exportVideoMp4');
+  if (webmBtn) {
+    webmBtn.addEventListener('click', async ()=>{
+      try { showLoading('Exporting WEBM', 'Rendering frames...'); await exportVideoWebm(); }
+      catch(err){ alert('Export failed: ' + (err?.message||err)); }
+      finally { hideLoading(); }
+    });
   }
-  // remove existing listeners safely (if any) and attach
-  btn.replaceWith(btn.cloneNode(true));
-  const newBtn = document.getElementById('exportVideo');
-  newBtn.addEventListener('click', handleExportClick);
+  if (mp4Btn) {
+    mp4Btn.addEventListener('click', async ()=>{
+      try { showLoading('Exporting MP4', 'Encoding video...'); await exportVideoMp4(); }
+      catch(err){ alert('Export failed: ' + (err?.message||err)); }
+      finally { hideLoading(); }
+    });
+  }
 })();
 
 // ---------- Helpers for export (no console logs) ----------
@@ -2861,17 +2910,15 @@ function drawOverlayForExport(ctx, elapsedMs, frameIndex, w, h, fps, desc) {
   ctx.restore();
 }
 
-// ---------- Robust exportVideo (no console logs) ----------
-async function exportVideo(){
+// ---------- Export WEBM (no audio) ----------
+async function exportVideoWebm(){
   if (!state.frames.length) { alert('No frames'); return; }
-
   const w = preview.width || 1280;
   const h = preview.height || 720;
   const rec = document.createElement('canvas');
   rec.width = w; rec.height = h;
   const ctx = rec.getContext('2d');
 
-  // create MediaRecorder safely
   let recorder;
   const chunks = [];
   const mime = chooseSupportedMime();
@@ -2885,25 +2932,21 @@ async function exportVideo(){
   recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
 
   const stopped = new Promise(resolve => recorder.onstop = resolve);
-  try { recorder.start(1000); } catch (err) { try { recorder.start(); } catch(e) { throw new Error('Recorder failed to start.'); } } // Fallback to start() without timeslice
+  try { recorder.start(1000); } catch (err) { try { recorder.start(); } catch(e) { throw new Error('Recorder failed to start.'); } }
 
-  // record frames
   let cumulativeMs = 0;
   const frameMs = 1000 / Math.max(1, state.fps || 24);
 
   for (let i = 0; i < state.frames.length; i++) {
     const f = state.frames[i] || createFrame(null);
-    const img = new Image();
-    // set crossOrigin to avoid taint if possible
-    try { img.crossOrigin = 'anonymous'; } catch(e) {}
-    img.src = f.thumb || blankImageData(w,h);
-    await new Promise(r => { img.onload = r; img.onerror = r; });
+    const cache = frameCache[i];
+    const img = cache?.bmp || await createBitmapFromSrc(f.thumb || blankImageData(w,h));
 
     const framesToShow = Math.max(1, Math.round(safeNumber(f.duration, state.defaultDuration)));
     for (let ff = 0; ff < framesToShow; ff++) {
       ctx.clearRect(0,0,w,h);
       try { drawImageCover(ctx, img, w, h); } catch(e){}
-      try { drawGuides(ctx, w, h); } catch(e){}        // <-- draw guides into exported frame
+      try { drawGuides(ctx, w, h); } catch(e){}
       drawOverlayForExport(ctx, cumulativeMs, i, w, h, state.fps || 24, f.desc || '');
       await waitMs(Math.round(frameMs));
       cumulativeMs += frameMs;
@@ -2912,13 +2955,128 @@ async function exportVideo(){
 
   recorder.stop();
   await stopped;
-
-  if (!chunks.length) {
-    throw new Error('No video data captured. Try using Chrome/Edge and ensure images are uploaded (not cross-origin blocked).');
-  }
-
+  if (!chunks.length) throw new Error('No video data captured.');
   const blob = new Blob(chunks, { type: mime });
   download(sanitizeFilename((document.getElementById('projectTitle').value || 'storyboard')) + '.webm', blob);
+}
+
+// ---------- Export MP4 (with audio) via ffmpeg.wasm ----------
+async function exportVideoMp4(){
+  if (!state.frames.length) { alert('No frames'); return; }
+  const w = preview.width || 1280;
+  const h = preview.height || 720;
+
+  // 1) Render frames to a single silent WEBM first
+  showLoading('Exporting MP4', 'Rendering frames...');
+  const webmBlob = await renderFramesToWebm(w, h);
+
+  // 2) Collect audio tracks (concatenate frame-level audios sequentially)
+  const audioBlobs = [];
+  for (let i=0;i<state.frames.length;i++){
+    const url = state.frames[i]?.music;
+    if (!url) continue;
+    try {
+      const res = await fetch(url);
+      const b = await res.blob();
+      audioBlobs.push(b);
+    } catch(_){/* skip */}
+  }
+
+  // 3) Use ffmpeg.wasm to mux WEBM video with concatenated audio (if any)
+  showLoading('Exporting MP4', 'Encoding and muxing...');
+  const mp4Blob = await muxToMp4(webmBlob, audioBlobs, state.fps);
+  download(sanitizeFilename((document.getElementById('projectTitle').value || 'storyboard')) + '.mp4', mp4Blob);
+}
+
+async function renderFramesToWebm(w, h){
+  const rec = document.createElement('canvas');
+  rec.width = w; rec.height = h;
+  const ctx = rec.getContext('2d');
+  const chunks = [];
+  const mime = chooseSupportedMime();
+  let recorder;
+  try {
+    const stream = rec.captureStream(Math.max(1, state.fps || 24));
+    recorder = new MediaRecorder(stream, { mimeType: mime });
+  } catch (err) {
+    throw new Error('MediaRecorder not available or mime not supported on this browser.');
+  }
+  recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(resolve => recorder.onstop = resolve);
+  try { recorder.start(1000); } catch (err) { try { recorder.start(); } catch(e) { throw new Error('Recorder failed to start.'); } }
+
+  let cumulativeMs = 0;
+  const frameMs = 1000 / Math.max(1, state.fps || 24);
+  for (let i = 0; i < state.frames.length; i++) {
+    const f = state.frames[i] || createFrame(null);
+    const cache = frameCache[i];
+    const img = cache?.bmp || await createBitmapFromSrc(f.thumb || blankImageData(w,h));
+    const framesToShow = Math.max(1, Math.round(safeNumber(f.duration, state.defaultDuration)));
+    for (let ff = 0; ff < framesToShow; ff++) {
+      ctx.clearRect(0,0,w,h);
+      try { drawImageCover(ctx, img, w, h); } catch(e){}
+      try { drawGuides(ctx, w, h); } catch(e){}
+      drawOverlayForExport(ctx, cumulativeMs, i, w, h, state.fps || 24, f.desc || '');
+      await waitMs(Math.round(frameMs));
+      cumulativeMs += frameMs;
+    }
+  }
+  recorder.stop();
+  await stopped;
+  if (!chunks.length) throw new Error('No video data captured.');
+  return new Blob(chunks, { type: mime });
+}
+
+// ffmpeg.wasm loader and mux helper
+let _ffmpegLoading = null;
+async function loadFfmpeg(){
+  if (window._ffmpeg) return window._ffmpeg;
+  if (_ffmpegLoading) return _ffmpegLoading;
+  _ffmpegLoading = (async ()=>{
+    const { createFFmpeg, fetchFile } = await import('https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js');
+    const ffmpeg = createFFmpeg({ log: false, corePath: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js' });
+    showLoading('Exporting MP4', 'Loading encoder (~20MB)...');
+    await ffmpeg.load();
+    window._ffmpeg = { ffmpeg, fetchFile };
+    return window._ffmpeg;
+  })();
+  return _ffmpegLoading;
+}
+
+async function muxToMp4(webmBlob, audioBlobs, fps){
+  const { ffmpeg, fetchFile } = await loadFfmpeg();
+  // Write video file
+  await ffmpeg.FS('writeFile', 'video.webm', await fetchFile(webmBlob));
+
+  // If multiple audios, concatenate to one
+  let audioInput = null;
+  if (audioBlobs && audioBlobs.length){
+    const inputs = [];
+    for (let i=0;i<audioBlobs.length;i++){
+      const name = `a${i}.mp3`;
+      await ffmpeg.FS('writeFile', name, await fetchFile(audioBlobs[i]));
+      inputs.push(name);
+    }
+    if (inputs.length === 1){
+      audioInput = inputs[0];
+    } else {
+      // Generate concat list
+      const list = inputs.map(n=>`file '${n}'`).join('\n');
+      await ffmpeg.FS('writeFile', 'alist.txt', new TextEncoder().encode(list));
+      await ffmpeg.run('-f','concat','-safe','0','-i','alist.txt','-c','copy','merged.mp3');
+      audioInput = 'merged.mp3';
+    }
+  }
+
+  // Transcode/mux to MP4 (H.264 + AAC)
+  const args = audioInput
+    ? ['-i','video.webm','-i',audioInput,'-c:v','libx264','-preset','veryfast','-crf','23','-r', String(Math.max(1,fps||24)),'-c:a','aac','-b:a','192k','-shortest','out.mp4']
+    : ['-i','video.webm','-c:v','libx264','-preset','veryfast','-crf','23','-r', String(Math.max(1,fps||24)),'out.mp4'];
+
+  updateLoading('Encoding MP4...');
+  await ffmpeg.run(...args);
+  const data = await ffmpeg.FS('readFile', 'out.mp4');
+  return new Blob([data.buffer], { type:'video/mp4' });
 }
 
 
@@ -2963,7 +3121,6 @@ function playbackLoop() {
 
     if (frameIdx === -1) {
         if (loopEnabled) {
-            // restart playback from beginning
             pausedTime = 0;
             currentFrameIndex = -1;
             playStartTime = performance.now();
@@ -2977,34 +3134,31 @@ function playbackLoop() {
 
     if (frameIdx !== currentFrameIndex) {
         currentFrameIndex = frameIdx;
-        selectFrame(currentFrameIndex);
-        
-        // Handle musik untuk frame yang baru
+        // Select without re-rendering list to avoid jank during playback
+        state.selected = clampIndex(currentFrameIndex);
         handleMusicForFrame(currentFrameIndex);
     }
     
     const f = state.frames[currentFrameIndex];
-    if (!f) {
-        stopPlayback();
+    if (!f) { stopPlayback(); return; }
+
+    const cached = frameCache[currentFrameIndex]?.bmp;
+    pctx.clearRect(0, 0, preview.width, preview.height);
+    if (cached) {
+        try { drawImageCover(pctx, cached, preview.width, preview.height); } catch(e){}
+        try { drawGuides(pctx, preview.width, preview.height); } catch(e) {}
+        drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
+        rafId = requestAnimationFrame(playbackLoop);
         return;
     }
-
-    const elapsedForCut = getElapsedInFrame(elapsed, currentFrameIndex);
-
     const img = new Image();
     img.onload = () => {
-        pctx.clearRect(0, 0, preview.width, preview.height);
-        try {
-          pctx.drawImage(img, 0, 0, preview.width, preview.height);
-        } catch (e) {}
-        // Aktifkan kembali guides untuk playback karena tidak lagi "terpanggang"
+        try { drawImageCover(pctx, img, preview.width, preview.height); } catch (e) {}
         try { drawGuides(pctx, preview.width, preview.height); } catch(e) {}
-        // overlay (time/title/desc)
         drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
         rafId = requestAnimationFrame(playbackLoop);
     };
     img.onerror = () => {
-        pctx.clearRect(0, 0, preview.width, preview.height);
         pctx.fillStyle = '#111';
         pctx.fillRect(0, 0, preview.width, preview.height);
         drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
@@ -3079,6 +3233,13 @@ function togglePlayback() {
 }
 
 playBtn.addEventListener('click', togglePlayback);
+
+// Preload frame cache when frames list changes significantly
+const origRenderList = renderList;
+renderList = function(){
+  origRenderList.apply(this, arguments);
+  scheduleUpdateFrameCache(100);
+};
 
 
 // ====================
@@ -3196,6 +3357,7 @@ window.addEventListener('load',()=>{
   pushHistory(); // Create initial history entry
   preview.width=1280; 
   preview.height=720; 
+  scheduleUpdateFrameCache(50);
   drawPreview(); 
   // Intro overlay logic removed
 });
@@ -3576,6 +3738,23 @@ function drawTransformedImageOnly(ctx) {
 }
 // ... existing code ...
 
+// Loading modal helpers
+function showLoading(title, sub){
+  const m=document.getElementById('exportLoading');
+  const t=document.getElementById('exportLoadingTitle');
+  const s=document.getElementById('exportLoadingSub');
+  if(t) t.textContent=title||'Processing...';
+  if(s) s.textContent=sub||'';
+  if(m) m.classList.add('open');
+}
+function updateLoading(sub){
+  const s=document.getElementById('exportLoadingSub');
+  if(s) s.textContent=sub||'';
+}
+function hideLoading(){
+  const m=document.getElementById('exportLoading');
+  if(m) m.classList.remove('open');
+}
 </script>
 </body>
 </html>
