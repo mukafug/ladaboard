@@ -407,6 +407,39 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
     display: none;
   }
   body.sidebar-open .mobile-backdrop { display: block; }
+
+  /* Mobile File dropdown: full-width fixed panel + vertical submenus */
+  .toolbar .dropdown { position: static; }
+  #fileDropdown .dropdown-menu {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 56px; /* sit below top toolbar */
+    width: 100vw;
+    min-width: 0;
+    border-radius: 0 0 12px 12px;
+    padding: 10px;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 2000; /* above sidebar backdrop */
+  }
+  /* stack submenu content vertically on mobile */
+  #fileDropdown .submenu-menu {
+    position: static;
+    top: auto; left: auto;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 6px 0 0 0;
+    margin: 4px 0 0 0;
+    box-shadow: none;
+    min-width: 0;
+    display: none; /* shown via .submenu.open */
+  }
+  #fileDropdown .submenu.open .submenu-menu { display: block; }
+  #fileDropdown .submenu .bx-chevron-right { transition: transform .2s ease; }
+  #fileDropdown .submenu.open .bx-chevron-right { transform: rotate(90deg); }
+  #fileDropdown .submenu:hover .submenu-menu { display: none !important; }
 }
 
 @media (max-width: 480px) {
@@ -742,9 +775,60 @@ const descInput = document.getElementById('descInput'); const durationSecInput =
 // wiring for File dropdown
 const fileDropdownEl = document.getElementById('fileDropdown');
 const fileMenuBtn = document.getElementById('fileMenuBtn');
+const fileMenu = document.getElementById('fileMenu');
+function closeAllSubmenus(){
+  try {
+    if (!fileDropdownEl) return;
+    fileDropdownEl.querySelectorAll('.submenu.open').forEach((el)=> el.classList.remove('open'));
+  } catch(_){}
+}
+function closeFileDropdown(){
+  try {
+    if (!fileDropdownEl) return;
+    fileDropdownEl.classList.remove('open');
+    closeAllSubmenus();
+  } catch(_){}
+}
 if (fileMenuBtn) {
-  fileMenuBtn.addEventListener('click', (e)=>{ e.stopPropagation(); fileDropdownEl.classList.toggle('open'); });
-  document.addEventListener('click', ()=> fileDropdownEl.classList.remove('open'));
+  fileMenuBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const willOpen = !fileDropdownEl.classList.contains('open');
+    if (willOpen) {
+      fileDropdownEl.classList.add('open');
+    } else {
+      closeFileDropdown();
+    }
+  });
+  // prevent accidental close when interacting inside the menu
+  if (fileMenu) {
+    ['click','touchstart'].forEach((evt)=>{
+      fileMenu.addEventListener(evt, (ev)=> ev.stopPropagation(), { passive: false });
+    });
+  }
+  // close on outside interaction / escape
+  ['click','touchstart'].forEach((evt)=>{
+    document.addEventListener(evt, ()=> closeFileDropdown(), { passive: true });
+  });
+  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeFileDropdown(); });
+
+  // toggle submenus on tap for mobile, and close others when opening one
+  const submenuToggles = fileDropdownEl.querySelectorAll('.submenu-toggle');
+  submenuToggles.forEach((toggle)=>{
+    toggle.addEventListener('click', (e)=>{
+      const isMobile = window.innerWidth <= 1024;
+      if (!isMobile) return; // keep hover behavior on desktop
+      e.preventDefault();
+      e.stopPropagation();
+      const parent = toggle.closest('.submenu');
+      const willOpen = !parent.classList.contains('open');
+      // close others
+      fileDropdownEl.querySelectorAll('.submenu.open').forEach((el)=>{ if (el !== parent) el.classList.remove('open'); });
+      if (willOpen) { parent.classList.add('open'); } else { parent.classList.remove('open'); }
+    }, { passive: false });
+  });
+
+  // reset submenu state when switching back to desktop
+  window.addEventListener('resize', ()=>{ if (window.innerWidth > 1024) closeAllSubmenus(); });
 }
 
 // drawing modal elements
