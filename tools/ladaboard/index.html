@@ -2341,6 +2341,11 @@ document.getElementById('confirmDraw').addEventListener('click',async ()=>{
     drawImageCover(tctx, baseImage, temp.width, temp.height);
   }
   
+  // If there is an active inserted image transformation, render it to the temp canvas without handles
+  if (insertImage) {
+    drawTransformedImageOnly(tctx);
+  }
+  
   // Tambahkan gambar hasil edit (tanpa onion skin)
   tctx.drawImage(drawCanvas,0,0);
 
@@ -3371,12 +3376,10 @@ function hitHandle(p) {
 }
 
 function requestCanvasRedrawWithInsertOverlay() {
-  // Repaint base and insert overlay
+  // Repaint base and overlays (onion/guides)
   redrawPaths();
-  if (insertImage) {
-    // redrawPaths clears and draws base, then we overlay the transform image+handles
-    drawTransformedImage(dctx);
-  }
+  // Draw insert preview (image + blue handles) on the overlay canvas only
+  drawTransformedImageOverlay();
 }
 
 let prevToolForInsert = null;
