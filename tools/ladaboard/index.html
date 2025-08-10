@@ -1377,6 +1377,12 @@ async function generateStoryboardPages() {
 
   const canvases = [];
 
+  // timeline helpers
+  const fpsNow = Math.max(1, state.fps || 24);
+  const totalFramesCount = state.frames.reduce((a,b)=> a + Math.max(1, safeNumber(b?.duration, state.defaultDuration)), 0);
+  const totalSecAll = totalFramesCount / fpsNow;
+  const formatTimeMMSS = (sec)=>{ sec = Math.max(0, Math.floor(sec||0)); const m = Math.floor(sec/60); const s = sec % 60; return pad2(m)+":"+pad2(s); };
+
   for (let p = 0; p < Math.ceil(state.frames.length / perPage); p++) {
     const c = document.createElement('canvas');
     c.width = pageW;
@@ -1471,8 +1477,16 @@ async function generateStoryboardPages() {
 
       // セリフ・音
       if (f.music) {
-        const name = f.music.split('/').pop().split('?')[0];
-        wrapText(ctx, `BGM: ${name} (00:00)`, colDialogue - mmToPx(4)).lines.forEach((line, li) => {
+        const name = (f.musicName && String(f.musicName)) || (f.music.split('/').pop().split('?')[0]);
+        const startFrames = state.frames.slice(0, idx).reduce((a,b)=> a + Math.max(1, safeNumber(b?.duration, state.defaultDuration)), 0);
+        const startSec = startFrames / fpsNow;
+        const endSec = (typeof f.musicDurationSec === 'number' && isFinite(f.musicDurationSec))
+          ? Math.min(totalSecAll, startSec + f.musicDurationSec)
+          : null;
+        const timeText = endSec == null
+          ? `played at ${formatTimeMMSS(startSec)} to end`
+          : `played at ${formatTimeMMSS(startSec)} to ${formatTimeMMSS(endSec)}`;
+        wrapText(ctx, `BGM: ${name} ${timeText}`, colDialogue - mmToPx(4)).lines.forEach((line, li) => {
           ctx.fillText(line, colX[3] + mmToPx(2), y + mmToPx(4) + li * mmToPx(4));
         });
       }
@@ -1672,6 +1686,8 @@ function renderList(){
             currentMusicUrl = null;
           }
           f.music = null;
+          f.musicName = null;
+          f.musicDurationSec = null;
           saveAuto();
           renderList();
         } else {
@@ -1683,7 +1699,21 @@ function renderList(){
           input.addEventListener('change', e => {
             const file = e.target.files[0];
             if (!file) return;
-            f.music = URL.createObjectURL(file);
+            const objectUrl = URL.createObjectURL(file);
+            f.music = objectUrl;
+            f.musicName = file.name || null;
+            // Probe duration
+            try {
+              const au = document.createElement('audio');
+              au.preload = 'metadata';
+              au.src = objectUrl;
+              au.onloadedmetadata = () => {
+                if (isFinite(au.duration)) {
+                  f.musicDurationSec = au.duration;
+                  saveAuto();
+                }
+              };
+            } catch(_) {}
             saveAuto();
             renderList();
           });
@@ -2608,6 +2638,11 @@ document.getElementById('saveProject').addEventListener('click', async ()=>{
           // Keep the original music if conversion fails
         }
       }
+      // Persist original filename and detected duration if available
+      if (f.musicName) frameCopy.musicName = f.musicName;
+      if (typeof f.musicDurationSec === 'number' && isFinite(f.musicDurationSec)) {
+        frameCopy.musicDurationSec = f.musicDurationSec;
+      }
 
       project.frames.push(frameCopy);
     }
@@ -2644,6 +2679,11 @@ loadProjectInput.addEventListener('change', async (e)=>{
             console.warn('Failed to convert music from base64:', err);
             frame.music = null; // Set to null if conversion fails
           }
+        }
+        // Ensure optional fields exist
+        if (typeof frame.musicName !== 'string') frame.musicName = null;
+        if (!(typeof frame.musicDurationSec === 'number' && isFinite(frame.musicDurationSec))) {
+          frame.musicDurationSec = null;
         }
       }
     }
@@ -2707,6 +2747,12 @@ document.getElementById('exportSpreadPdf').addEventListener('click', async () =>
     pageWmm - marginXmm
   ];
 
+  // timeline helpers for pdf
+  const fpsNow = Math.max(1, state.fps || 24);
+  const totalFramesCount = state.frames.reduce((a,b)=> a + Math.max(1, safeNumber(b?.duration, state.defaultDuration)), 0);
+  const totalSecAll = totalFramesCount / fpsNow;
+  const formatTimeMMSS = (sec)=>{ sec = Math.max(0, Math.floor(sec||0)); const m = Math.floor(sec/60); const s = sec % 60; return pad2(m)+":"+pad2(s); };
+
   for (let p = 0; p < Math.ceil(state.frames.length / perPage); p++) {
     if (p > 0) pdf.addPage();
 
@@ -2759,8 +2805,16 @@ document.getElementById('exportSpreadPdf').addEventListener('click', async () =>
 
       // Dialogue / Sound
       if (f.music) {
-        const name = f.music.split('/').pop().split('?')[0];
-        let musicLines = pdf.splitTextToSize(`BGM: ${name} (00:00)`, colDialogue - 4);
+        const name = (f.musicName && String(f.musicName)) || (f.music.split('/').pop().split('?')[0]);
+        const startFrames = state.frames.slice(0, idx).reduce((a,b)=> a + Math.max(1, safeNumber(b?.duration, state.defaultDuration)), 0);
+        const startSec = startFrames / fpsNow;
+        const endSec = (typeof f.musicDurationSec === 'number' && isFinite(f.musicDurationSec))
+          ? Math.min(totalSecAll, startSec + f.musicDurationSec)
+          : null;
+        const timeText = endSec == null
+          ? `played at ${formatTimeMMSS(startSec)} to end`
+          : `played at ${formatTimeMMSS(startSec)} to ${formatTimeMMSS(endSec)}`;
+        let musicLines = pdf.splitTextToSize(`BGM: ${name} ${timeText}`, colDialogue - 4);
         pdf.text(musicLines, colX[3] + 2, y + 4);
       }
 
@@ -3767,6 +3821,19 @@ function drawTransformedImageOnly(ctx) {
   titleEl.addEventListener('change', persist);
   titleEl.addEventListener('blur', persist);
 })();
+
+// Helper: get user-friendly music display name (avoid blob/data UUIDs)
+function getMusicDisplayName(frame) {
+  if (!frame) return 'Audio';
+  const named = (typeof frame.musicName === 'string' && frame.musicName.trim()) ? frame.musicName.trim() : null;
+  if (named) return named;
+  const url = frame.music || '';
+  if (/^https?:/i.test(url) || /^file:/i.test(url)) {
+    try { return url.split('/').pop().split('?')[0] || 'Audio'; } catch(_) { return 'Audio'; }
+  }
+  // For blob: or data: URLs we cannot infer a filename reliably
+  return 'Audio';
+}
 
 </script>
 </body>
