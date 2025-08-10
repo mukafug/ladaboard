@@ -361,6 +361,61 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
   scroll-behavior: smooth;
 }
 
+/* -------- Responsive Enhancements (non-destructive) -------- */
+.mobile-only { display: none; }
+
+@media (max-width: 1600px) {
+  .app { gap: 16px; padding: 16px; }
+  .sidebar { width: 340px; }
+  .canvas-stage { max-height: 68vh; }
+}
+
+@media (max-width: 1366px) {
+  .app { gap: 14px; padding: 14px; }
+  .sidebar { width: 300px; }
+  .toolbar { flex-wrap: wrap; row-gap: 8px; overflow-x: auto; }
+  .mode-toggle { min-width: 140px; }
+  .canvas-stage { max-height: 62vh; }
+  .truncate { max-width: 380px; }
+}
+
+@media (max-width: 1024px) {
+  .app { flex-direction: column; gap: 12px; padding: 12px; height: auto; }
+  .side-right { position: relative; top: 0; max-width: 100%; }
+  .canvas-stage { max-height: 48vh; }
+  .mobile-only { display: inline-flex; }
+
+  /* Off-canvas sidebar */
+  .sidebar {
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: min(92vw, 420px);
+    max-width: 420px;
+    height: 100vh;
+    transform: translateX(-110%);
+    transition: transform .25s ease;
+    z-index: 1750;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+  }
+  body.sidebar-open .sidebar { transform: translateX(0); }
+
+  .mobile-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1700;
+    display: none;
+  }
+  body.sidebar-open .mobile-backdrop { display: block; }
+}
+
+@media (max-width: 480px) {
+  .btn { padding: 6px 8px; }
+  .input { padding: 6px; }
+  .mode-toggle { min-width: 120px; }
+}
+/* -------- End Responsive Enhancements -------- */
+
 </style>
 </head>
 <body>
@@ -400,6 +455,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
 
   <div class="side-right">
     <div class="toolbar">
+      <button class="btn mobile-only" id="openSidebar"><i class='bx bx-menu'></i> Frames</button>
       <!-- File dropdown placed to the left of FPS setting -->
       <div class="dropdown" id="fileDropdown">
         <button class="btn" id="fileMenuBtn"><i class='bx bx-file'></i> File</button>
@@ -454,6 +510,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
     </div>
   </div>
 </div>
+<div class="mobile-backdrop" id="mobileBackdrop"></div>
 
 <!-- Drawing modal -->
 <div class="dialog" id="drawDialog">
@@ -1610,6 +1667,9 @@ function selectFrame(i, e = {}) {
     }
     
     drawPreview();
+
+    // Auto-close sidebar on mobile after selection for better UX
+    try { if (window.innerWidth <= 1024) { document.body.classList.remove('sidebar-open'); } } catch(_){}
 }
 
 
@@ -3033,6 +3093,15 @@ function handleMusicForFrame(frameIndex){
     currentMusicUrl = frame.music;
   }
 }
+
+// Mobile sidebar overlay controls
+const openSidebarBtn = document.getElementById('openSidebar');
+const mobileBackdrop = document.getElementById('mobileBackdrop');
+function openSidebarOverlay(){ document.body.classList.add('sidebar-open'); }
+function closeSidebarOverlay(){ document.body.classList.remove('sidebar-open'); }
+if (openSidebarBtn) openSidebarBtn.addEventListener('click', openSidebarOverlay);
+if (mobileBackdrop) mobileBackdrop.addEventListener('click', closeSidebarOverlay);
+window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeSidebarOverlay(); });
 </script>
 </body>
 </html>
