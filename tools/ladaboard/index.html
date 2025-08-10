@@ -371,12 +371,13 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
 }
 
 @media (max-width: 1366px) {
-  .app { gap: 14px; padding: 14px; }
-  .sidebar { width: 300px; }
+  /* Ensure 100% zoom equivalent layout fits 1366p width */
+  .app { gap: 12px; padding: 10px; }
+  .sidebar { width: 280px; }
   .toolbar { flex-wrap: wrap; row-gap: 8px; overflow-x: auto; }
   .mode-toggle { min-width: 140px; }
-  .canvas-stage { max-height: 62vh; }
-  .truncate { max-width: 380px; }
+  .canvas-stage { max-height: 66vh; }
+  .truncate { max-width: 360px; }
 }
 
 @media (max-width: 1024px) {
@@ -564,12 +565,9 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
         <button class="toolbtn" id="undoBtn" title="Undo"><i class='bx bx-undo'></i></button>
         <button class="toolbtn" id="redoBtn" title="Redo"><i class='bx bx-redo'></i></button>
         <button class="toolbtn" id="clearBtn" title="Clear Canvas"><i class='bx bx-brush-alt'></i></button>
+        <button id="addImageBtn" class="btn small-edit" title="Add Image"><i class='bx bx-image-add'></i></button>
+        <button id="applyImageBtn" class="btn small-edit" title="Apply Image" style="display:none"><i class='bx bx-check'></i></button>
 
-        <!-- eraser mode toggle -->
-        <div style="display:flex;gap:6px;align-items:center;margin-left:8px">
-          <label class="small-muted">Mode </label>
-          <button id="eraserModeBtn" class="btn" style="padding:6px">Stroke</button>
-        </div>
 
         <!-- Onion skin controls (paste di canvas-toolbar) -->
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
@@ -621,6 +619,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
         <canvas id="onionCanvas" width="1024" height="576" style="position:absolute; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
         
         <canvas id="guideCanvas" width="1024" height="576" style="position:absolute; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
+        <canvas id="insertCanvas" width="1024" height="576" style="position:absolute; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;padding:8px">
@@ -631,6 +630,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
 </div>
 
 <input type="file" id="uploader" accept="image/*" style="display:none" multiple />
+<input type="file" id="insertImageInput" accept="image/*" style="display:none" />
 <input type="file" id="loadProjectInput" accept="application/json" style="display:none" />
 
 <!-- INTRO OVERLAY -->
@@ -841,6 +841,8 @@ const octx = onionCanvas.getContext('2d');
 // TAMBAHKAN DUA BARIS DI BAWAH INI
 const guideCanvas = document.getElementById('guideCanvas');
 const gctx = guideCanvas.getContext('2d');
+const insertCanvas = document.getElementById('insertCanvas');
+const ictx = insertCanvas.getContext('2d');
 
 // Main drawing canvas - everything will be drawn here as bitmap
 let drawingHistory = []; // Array of canvas states for undo/redo
@@ -1209,7 +1211,7 @@ function renderOnionSkinsOverlay(refIndex) {
 }
 let tool='pen', color='#000', size=6, drawing=false;
 let baseImage = null; // Image object for background when editing an existing frame
-let eraserMode = 'stroke'; // 'stroke' (destination-out strokes) or 'pick' (click to remove a single path / cut area)
+let eraserMode = 'stroke'; // legacy, eraser mode toggle removed
 
 // utilities
 function createFrame(img=null){ return { thumb: img || null, desc: '', duration: Number(state.defaultDuration) || 24, music: null }; }
@@ -1886,6 +1888,8 @@ function openDraw(initial = null){
   onionCanvas.height = drawCanvas.height;
   guideCanvas.width = drawCanvas.width;
   guideCanvas.height = drawCanvas.height;
+  insertCanvas.width = drawCanvas.width;
+  insertCanvas.height = drawCanvas.height;
   
   // Initialize new bitmap drawing system
   initDrawingCanvas();
@@ -1936,6 +1940,9 @@ function closeDraw(){
   // Clear onion skin dan guide overlay saat modal ditutup
   octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
   gctx.clearRect(0, 0, guideCanvas.width, guideCanvas.height); // <-- Baris baru
+  ictx.clearRect(0, 0, insertCanvas.width, insertCanvas.height);
+  insertImage = null;
+  applyImageBtn && (applyImageBtn.style.display = 'none');
 }
 
 // toolbar events
@@ -1944,7 +1951,7 @@ document.getElementById('colorPicker').addEventListener('input',e=>{color=e.targ
 document.getElementById('sizeRange').addEventListener('input',e=>{size=Number(e.target.value)||6; brushSize = size;});
 
 // eraser mode toggle button
-const eraserModeBtn = document.getElementById('eraserModeBtn'); eraserModeBtn.addEventListener('click',()=>{ eraserMode = (eraserMode==='stroke') ? 'pick' : 'stroke'; eraserModeBtn.textContent = (eraserMode==='stroke')? 'Stroke' : 'Pick'; });
+// eraser mode toggle removed by request
 
 function hexToRgba(hex) {
     let c;
@@ -2189,7 +2196,7 @@ drawCanvas.addEventListener('pointerup', e => {
 });
 drawCanvas.addEventListener('pointerleave', stopDrawing); // Stop drawing if pointer leaves canvas
 
-function toLocal(e){ const r=drawCanvas.getBoundingClientRect(); return { x:(e.clientX-r.left)*(drawCanvas.width/r.width||1), y:(e.clientY-r.top)*(drawCanvas.height/r.height||1), pressure: e.pressure }; }
+function toLocal(e){ const r=drawCanvas.getBoundingClientRect(); return { x:(e.clientX-r.left)*(drawCanvas.width/r.width||1), y:(e.clientY-r.top)*(drawCanvas.height/r.height||1), pressure: e.pressure } }
 
 function redrawPaths(){ 
   // 1. Gambar utama di dctx (drawCanvas)
@@ -3186,6 +3193,322 @@ function closeSidebarOverlay(){ document.body.classList.remove('sidebar-open'); 
 if (openSidebarBtn) openSidebarBtn.addEventListener('click', openSidebarOverlay);
 if (mobileBackdrop) mobileBackdrop.addEventListener('click', closeSidebarOverlay);
 window.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeSidebarOverlay(); });
+
+// Image transform state for insert tool
+let insertImage = null; // HTMLImageElement when active
+let insertTransform = {
+  x: 512,
+  y: 288,
+  scaleX: 1,
+  scaleY: 1,
+  rotation: 0,
+  skewX: 0,
+  skewY: 0,
+  width: 0,
+  height: 0,
+  dragging: false,
+  dragMode: null, // 'move' | 'scale' | 'rotate' | 'skewX' | 'skewY'
+  dragModeCorner: null,
+  startPointer: {x:0,y:0},
+  startState: null
+};
+let suppressInsertOverlay = false;
+const HANDLE = { corner: 14, edge: 12, rotRadius: 8, rotOffset: 28 };
+
+const addImageBtn = document.getElementById('addImageBtn');
+const applyImageBtn = document.getElementById('applyImageBtn');
+const insertImageInput = document.getElementById('insertImageInput');
+
+function hasActiveInsert() { return !!insertImage; }
+
+function drawTransformedImage(ctx) {
+  if (!insertImage) return;
+  const cx = insertTransform.x;
+  const cy = insertTransform.y;
+  const w = insertTransform.width;
+  const h = insertTransform.height;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  // apply transform matrix: scale, skew, rotate
+  ctx.rotate(insertTransform.rotation);
+  ctx.transform(1, Math.tan(insertTransform.skewY), Math.tan(insertTransform.skewX), 1, 0, 0);
+  ctx.scale(insertTransform.scaleX, insertTransform.scaleY);
+  ctx.drawImage(insertImage, -w/2, -h/2, w, h);
+  ctx.restore();
+
+  // draw handles
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(insertTransform.rotation);
+  ctx.transform(1, Math.tan(insertTransform.skewY), Math.tan(insertTransform.skewX), 1, 0, 0);
+  ctx.scale(insertTransform.scaleX, insertTransform.scaleY);
+  ctx.strokeStyle = '#39f';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6,4]);
+  ctx.strokeRect(-w/2, -h/2, w, h);
+  ctx.setLineDash([]);
+  const handle = 10; // pixels in local space
+  ctx.fillStyle = '#39f';
+  // corners for scale
+  [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].forEach(([hx,hy])=>{
+    ctx.fillRect(hx-handle/2, hy-handle/2, handle, handle);
+  });
+  // rotation handle: top center
+  ctx.beginPath();
+  ctx.arc(0, -h/2-24, 6, 0, Math.PI*2);
+  ctx.fill();
+  // skew handles: middle of edges
+  ctx.fillStyle = '#9cf';
+  [[0,-h/2],[w/2,0],[0,h/2],[-w/2,0]].forEach(([hx,hy])=>{
+    ctx.fillRect(hx-6, hy-6, 12, 12);
+  });
+  ctx.restore();
+}
+
+function screenToCanvasPoint(e) {
+  const r = drawCanvas.getBoundingClientRect();
+  return { x:(e.clientX-r.left)*(drawCanvas.width/r.width||1), y:(e.clientY-r.top)*(drawCanvas.height/r.height||1) };
+}
+
+function hitHandle(p) {
+  if (!insertImage) return null;
+  const {x,y,scaleX,scaleY,rotation,skewX,skewY,width,height} = insertTransform;
+  let px = p.x - x, py = p.y - y;
+  const cos = Math.cos(-rotation), sin = Math.sin(-rotation);
+  let rx = px * cos - py * sin;
+  let ry = px * sin + py * cos;
+  const tanY = Math.tan(skewY), tanX = Math.tan(skewX);
+  let sx = rx - tanX * ry;
+  let sy = ry - tanY * sx;
+  const lx = sx / scaleX;
+  const ly = sy / scaleY;
+
+  const w = width, h = height;
+  const near = (ax,ay, bx,by, s)=> Math.abs(ax-bx)<=s && Math.abs(ay-by)<=s;
+  // corners -> scale
+  if (near(lx,ly, -w/2, -h/2, HANDLE.corner)) return {mode:'scale', corner:'tl'};
+  if (near(lx,ly,  w/2, -h/2, HANDLE.corner)) return {mode:'scale', corner:'tr'};
+  if (near(lx,ly,  w/2,  h/2, HANDLE.corner)) return {mode:'scale', corner:'br'};
+  if (near(lx,ly, -w/2,  h/2, HANDLE.corner)) return {mode:'scale', corner:'bl'};
+  // rotation handle near top center
+  if (Math.hypot(lx-0, ly-(-h/2-HANDLE.rotOffset)) <= HANDLE.rotRadius + 4) return {mode:'rotate'};
+  // skew handles mid edges
+  if (near(lx,ly, 0, -h/2, HANDLE.edge)) return {mode:'skewY', edge:'top'};
+  if (near(lx,ly,  w/2, 0, HANDLE.edge)) return {mode:'skewX', edge:'right'};
+  if (near(lx,ly, 0,  h/2, HANDLE.edge)) return {mode:'skewY', edge:'bottom'};
+  if (near(lx,ly, -w/2, 0, HANDLE.edge)) return {mode:'skewX', edge:'left'};
+  // inside rect -> move
+  if (lx>=-w/2 && lx<=w/2 && ly>=-h/2 && ly<=h/2) return {mode:'move'};
+  return null;
+}
+
+function requestCanvasRedrawWithInsertOverlay() {
+  // Repaint base and insert overlay
+  redrawPaths();
+  if (insertImage) {
+    // redrawPaths clears and draws base, then we overlay the transform image+handles
+    drawTransformedImage(dctx);
+  }
+}
+
+let prevToolForInsert = null;
+addImageBtn?.addEventListener('click', ()=>{
+  insertImageInput?.click();
+});
+
+insertImageInput?.addEventListener('change', async (e)=>{
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      insertImage = img;
+      prevToolForInsert = tool;
+      tool = 'insert';
+      insertTransform.width = Math.min(drawCanvas.width * 0.6, img.width);
+      insertTransform.height = insertTransform.width * (img.height / img.width);
+      insertTransform.x = drawCanvas.width/2;
+      insertTransform.y = drawCanvas.height/2;
+      insertTransform.scaleX = 1; insertTransform.scaleY = 1;
+      insertTransform.rotation = 0; insertTransform.skewX = 0; insertTransform.skewY = 0;
+      applyImageBtn.style.display = 'inline-flex';
+      requestCanvasRedrawWithInsertOverlay();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  // reset file input value so same file can be chosen again later
+  e.target.value = '';
+});
+
+applyImageBtn?.addEventListener('click', ()=>{
+  if (!insertImage) return;
+  // permanently draw transformed image onto drawCanvas and push to history
+  saveCanvasState();
+  // draw current transformed image directly onto base canvas (no handles)
+  drawTransformedImageOnly(dctx);
+  // clear overlay state
+  insertImage = null;
+  ictx.clearRect(0,0,insertCanvas.width, insertCanvas.height);
+  applyImageBtn.style.display = 'none';
+  tool = prevToolForInsert || 'pen';
+  prevToolForInsert = null;
+  // save state after applying
+  saveCanvasState();
+});
+
+// also cleanup on cancel/close
+const cancelBtn = document.getElementById('cancelDraw');
+if (cancelBtn) cancelBtn.addEventListener('click', ()=>{
+  insertImage = null;
+  applyImageBtn.style.display = 'none';
+  tool = prevToolForInsert || tool;
+  prevToolForInsert = null;
+});
+
+// augment pointer interactions when insert is active
+(function attachInsertPointerHandlers(){
+  drawCanvas.addEventListener('pointerdown', (e)=>{
+    if (!insertImage) return; // let default tools handle
+    const p = screenToCanvasPoint(e);
+    const hit = hitHandle(p);
+    if (!hit) return;
+    e.preventDefault();
+    insertTransform.dragging = true;
+    insertTransform.dragMode = hit.mode;
+    insertTransform.dragModeCorner = hit.corner || null;
+    insertTransform.startPointer = p;
+    insertTransform.startState = JSON.parse(JSON.stringify(insertTransform));
+    drawCanvas.setPointerCapture(e.pointerId);
+  });
+
+  drawCanvas.addEventListener('pointermove', (e)=>{
+    if (!insertImage || !insertTransform.dragging) return;
+    const p = screenToCanvasPoint(e);
+    const dx = p.x - insertTransform.startPointer.x;
+    const dy = p.y - insertTransform.startPointer.y;
+    const s = insertTransform.startState;
+    switch (insertTransform.dragMode) {
+      case 'move':
+        insertTransform.x = s.x + dx;
+        insertTransform.y = s.y + dy;
+        break;
+      case 'scale': {
+        const corner = insertTransform.dragModeCorner || 'br';
+        const signX = (corner === 'tr' || corner === 'br') ? 1 : -1;
+        const signY = (corner === 'bl' || corner === 'br') ? 1 : -1;
+        let factorX = 1 + (dx * signX) / 300;
+        let factorY = 1 + (dy * signY) / 300;
+        if (e.shiftKey) {
+          const delta = Math.abs(dx) > Math.abs(dy) ? dx * signX : dy * signY;
+          const f = 1 + delta / 300;
+          factorX = f; factorY = f;
+        }
+        insertTransform.scaleX = Math.max(0.05, s.scaleX * factorX);
+        insertTransform.scaleY = Math.max(0.05, s.scaleY * factorY);
+        break;
+      }
+      case 'rotate': {
+        const angle0 = Math.atan2(insertTransform.startPointer.y - s.y, insertTransform.startPointer.x - s.x);
+        let angle1 = Math.atan2(p.y - s.y, p.x - s.x);
+        let newAngle = s.rotation + (angle1 - angle0);
+        if (e.shiftKey) {
+          const step = Math.PI / 12; // 15°
+          newAngle = Math.round(newAngle / step) * step;
+        }
+        insertTransform.rotation = newAngle;
+        break;
+      }
+      case 'skewX': {
+        insertTransform.skewX = s.skewX + dx / 300;
+        break;
+      }
+      case 'skewY': {
+        insertTransform.skewY = s.skewY + dy / 300;
+        break;
+      }
+    }
+    requestCanvasRedrawWithInsertOverlay();
+  });
+
+  const stop = (e)=>{
+    if (!insertImage) return;
+    if (insertTransform.dragging) {
+      insertTransform.dragging = false;
+      drawCanvas.releasePointerCapture(e.pointerId);
+    }
+  };
+  drawCanvas.addEventListener('pointerup', stop);
+  drawCanvas.addEventListener('pointercancel', stop);
+})();
+
+
+// ... existing code ...
+function drawTransformedImageOverlay() {
+  if (!insertImage) {
+    ictx.clearRect(0,0,insertCanvas.width,insertCanvas.height);
+    return;
+  }
+  ictx.clearRect(0,0,insertCanvas.width,insertCanvas.height);
+  const ctx = ictx;
+  const cx = insertTransform.x;
+  const cy = insertTransform.y;
+  const w = insertTransform.width;
+  const h = insertTransform.height;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(insertTransform.rotation);
+  ctx.transform(1, Math.tan(insertTransform.skewY), Math.tan(insertTransform.skewX), 1, 0, 0);
+  ctx.scale(insertTransform.scaleX, insertTransform.scaleY);
+  ctx.drawImage(insertImage, -w/2, -h/2, w, h);
+  ctx.restore();
+  // Handles + bbox
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(insertTransform.rotation);
+  ctx.transform(1, Math.tan(insertTransform.skewY), Math.tan(insertTransform.skewX), 1, 0, 0);
+  ctx.scale(insertTransform.scaleX, insertTransform.scaleY);
+  ctx.strokeStyle = '#39f';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6,4]);
+  ctx.strokeRect(-w/2, -h/2, w, h);
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#39f';
+  const halfCorner = HANDLE.corner / 2;
+  [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].forEach(([hx,hy])=>{
+    ctx.fillRect(hx-halfCorner, hy-halfCorner, HANDLE.corner, HANDLE.corner);
+  });
+  ctx.beginPath();
+  ctx.arc(0, -h/2-HANDLE.rotOffset, HANDLE.rotRadius, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#9cf';
+  const halfEdge = HANDLE.edge / 2;
+  [[0,-h/2],[w/2,0],[0,h/2],[-w/2,0]].forEach(([hx,hy])=>{
+    ctx.fillRect(hx-halfEdge, hy-halfEdge, HANDLE.edge, HANDLE.edge);
+  });
+  ctx.restore();
+}
+// ... existing code ...
+
+// ... existing code ...
+function drawTransformedImageOnly(ctx) {
+  if (!insertImage) return;
+  const cx = insertTransform.x;
+  const cy = insertTransform.y;
+  const w = insertTransform.width;
+  const h = insertTransform.height;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(insertTransform.rotation);
+  ctx.transform(1, Math.tan(insertTransform.skewY), Math.tan(insertTransform.skewX), 1, 0, 0);
+  ctx.scale(insertTransform.scaleX, insertTransform.scaleY);
+  ctx.drawImage(insertImage, -w/2, -h/2, w, h);
+  ctx.restore();
+}
+// ... existing code ...
+
 </script>
 </body>
 </html>
