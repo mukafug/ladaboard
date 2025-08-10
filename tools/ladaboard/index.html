@@ -480,6 +480,36 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
   .dropdown-menu .btn { padding: 10px 12px; }
 }
 
+/* ===== Timeline (Adobe Animate-like) ===== */
+.timeline-container { 
+  background: var(--panel);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  margin-top: 22px; /* push down a bit so stamps not cramped */
+  overflow: hidden;
+}
+.timeline-toolbar { 
+  display:flex; align-items:center; justify-content:space-between; 
+  padding:4px 8px; border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.timeline-toolbar .tl-label { font-weight:700; color:#e6eef8; margin-right:8px; font-size:11px; letter-spacing:.2px; }
+.timeline-scroller { overflow: auto; background: #161616; }
+#timelineCanvas { display:block; height: 124px; min-width: 100%; }
+/* Hide scrollbar height wise */
+.timeline-scroller::-webkit-scrollbar { height: 8px; }
+.timeline-scroller::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 6px; }
+/* ===== End Timeline ===== */
+
+/* Reorder animation for sidebar frames */
+@keyframes framePop {
+  0% { transform: scale(0.98); box-shadow: 0 0 0 rgba(217,250,0,0); }
+  60% { transform: scale(1.02); box-shadow: 0 10px 26px rgba(217,250,0,0.18); }
+  100% { transform: scale(1); box-shadow: 0 0 0 rgba(217,250,0,0); }
+}
+.frame.reordered { animation: framePop 320ms ease; }
+/* Playback highlight in sidebar */
+@keyframes playingPulse { from { box-shadow: 0 0 0 rgba(217,250,0,0.00); } to { box-shadow: 0 0 16px rgba(217,250,0,0.18); } }
+.frame.playing { border-color: rgba(217,250,0,0.65); background: rgba(217,250,0,0.05); animation: playingPulse 1.2s ease-in-out infinite alternate; }
 </style>
 </head>
 <body>
@@ -565,9 +595,27 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
       <canvas id="preview" width="1280" height="720"></canvas>
     </div>
 
-    <div class="row">
+    <!-- NEW: Timeline container (Adobe Animate-like) -->
+    <div id="timelineContainer" class="timeline-container">
+      <div class="timeline-toolbar">
+        <div class="tl-left">
+          <span class="tl-label">Timeline</span>
+          <span id="tlTimecode" class="small-muted" style="margin-left:8px; font-weight:700; letter-spacing:.3px;"></span>
+          <button id="tlZoomOut" class="icon-btn" title="Zoom Out (-)"><i class='bx bx-zoom-out'></i></button>
+          <button id="tlZoomIn" class="icon-btn" title="Zoom In (+)"><i class='bx bx-zoom-in'></i></button>
+        </div>
+        <div class="tl-right">
+          <span id="tlScaleText" class="small-muted"></span>
+        </div>
+      </div>
+      <div id="timelineScroller" class="timeline-scroller">
+        <canvas id="timelineCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Hidden original bottom meta row preserved for compatibility -->
+    <div class="row" id="bottomMetaRow" style="display:none">
       <div style="flex:1">
-        <!-- changed to textarea so Shift+Enter can make newline -->
         <textarea id="descInput" class="input" placeholder="Description for selected frame" autocomplete="off"></textarea>
       </div>
       <div class="duration-group">
@@ -578,7 +626,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
       </div>
     </div>
 
-    <div class="footer">
+    <div class="footer" id="bottomFooter" style="display:none">
       <div class="small-muted">Total Frames: <span id="totalFrames">0</span></div>
       <div class="small-muted">Project length: <span id="projectLength">0s</span></div>
     </div>
@@ -1774,21 +1822,43 @@ function normalizePairToFrames(secText, frmText, fps){
 function reorder(from,to){ 
   if(from===to) return; 
   if(from<0||to<0||from>=state.frames.length||to>state.frames.length) return; 
+  // Capture timeline positions before reorder for move animation
+  let beforeMap = null;
+  try { beforeMap = computeFramePositions(); } catch(_){}
   pushHistory(); 
   const [it] = state.frames.splice(from,1); 
   state.frames.splice(to,0,it); 
   renderList(); 
   selectFrame(Math.min(to,state.frames.length-1)); 
   saveAuto(); 
+  try { setTimelineSize(); } catch(_){ }
+  // Setup move animation on timeline
+  try {
+    const afterMap = computeFramePositions();
+    tl.moveAnim = { fromMap: beforeMap || new Map(), toMap: afterMap, start: performance.now(), duration: 320 };
+    animateTimelineMove();
+  } catch(_){}
+  try { renderTimeline(); } catch(_){ }
+  // Sidebar reorder pop animation
+  try {
+    setTimeout(()=>{
+      const el = framesList.children[to];
+      if (el) {
+        el.classList.add('reordered');
+        el.addEventListener('animationend', ()=> el.classList.remove('reordered'), { once: true });
+      }
+    }, 0);
+  } catch(_){}
+  // Timeline flash highlight (handled in render via tl.flashUntil)
+  try {
+    tl.flashIndex = to; tl.flashUntil = performance.now() + 450; animateTimelineFlash();
+  } catch(_){}
 }
 
 function highlightSelected(){
   Array.from(framesList.children).forEach((el, idx) => {
-    if (selectedFrames.has(idx)) {
-      el.classList.add('selected');
-    } else {
-      el.classList.remove('selected');
-    }
+    if (selectedFrames.has(idx)) { el.classList.add('selected'); } else { el.classList.remove('selected'); }
+    if (playing && idx === currentFrameIndex) { el.classList.add('playing'); } else { el.classList.remove('playing'); }
   });
 }
 
@@ -1837,31 +1907,43 @@ function selectFrame(i, e = {}) {
     } else {
         const f = state.frames[state.selected] || createFrame(null);
         descInput.value = f.desc || '';
-        const parts = splitDurationFrames(safeNumber(f.duration, state.defaultDuration), state.fps);
+        const parts = splitDurationFrames(safeNumber(f.duration, state.fps), state.fps);
         durationSecInput.value = String(parts.sec);
         durationFrmInput.value = String(parts.frm);
     }
     
     // If clicking on an input element, focus it after selection
     if (clickedElement && (clickedElement.tagName === 'INPUT' || clickedElement.tagName === 'TEXTAREA')) {
-        // Only focus if the input isn't already focused
         if (document.activeElement !== clickedElement) {
-            // Use setTimeout to ensure selection happens before focus
             setTimeout(() => {
                 try {
                     clickedElement.focus();
-                    // If it's a text input, select all text for easy editing
                     if (clickedElement.type === 'text' || clickedElement.type === 'number') {
                         clickedElement.select();
                     }
-                } catch (e) {
-                    // Ignore focus errors
-                }
+                } catch (e) {}
             }, 0);
         }
     }
     
     drawPreview();
+
+    // Sync timeline playhead to the start of selected frame IF not playing
+    try {
+      if (!playing && state.selected >= 0) {
+        let framesBefore = 0;
+        for (let k = 0; k < state.selected; k++) framesBefore += Math.max(1, state.frames[k].duration);
+        if (typeof tl !== 'undefined') {
+          tl.playhead = framesBefore;
+          tl.selection = new Set([state.selected]);
+          renderTimeline();
+        }
+      } else if (typeof tl !== 'undefined') {
+        // still sync selection highlight without moving playhead
+        tl.selection = new Set([state.selected]);
+        renderTimeline();
+      }
+    } catch(_){ }
 
     // Auto-close sidebar on mobile after selection for better UX
     try { if (window.innerWidth <= 1024) { document.body.classList.remove('sidebar-open'); } } catch(_){}
@@ -1963,7 +2045,7 @@ function drawPreview(){
   const f = state.frames[sel]; 
   if(f.thumb){ 
     const img = new Image(); 
-    img.onload = ()=>{
+    img.onload = ()=>{ 
       drawImageCover(pctx,img,preview.width,preview.height); 
       // Tambahkan guides untuk mode Upload juga
       drawGuides(pctx, preview.width, preview.height);
@@ -2572,6 +2654,7 @@ function updateSelectedDurationFromSide(){
     durationFrmInput.value = String(parts.frm);
     renderList();
     saveAuto();
+    try { setTimelineSize(); renderTimeline(); } catch(_){}
   }
 }
 durationSecInput.addEventListener('change', updateSelectedDurationFromSide);
@@ -3196,6 +3279,7 @@ function playbackLoop() {
     if (!playing) return;
 
     const elapsed = pausedTime + (performance.now() - playStartTime);
+    try { setPlayheadFromElapsedMs(elapsed); } catch(_){}
     const frameIdx = findFrameIndex(elapsed);
 
     if (frameIdx === -1) {
@@ -3214,29 +3298,20 @@ function playbackLoop() {
 
     if (frameIdx !== currentFrameIndex) {
         currentFrameIndex = frameIdx;
-        selectFrame(currentFrameIndex);
-        
-        // Handle musik untuk frame yang baru
+        // Update sidebar playing highlight
+        try { highlightSelected(); } catch(_){}
+        // Do NOT change selection during playback; just handle audio
         handleMusicForFrame(currentFrameIndex);
     }
     
     const f = state.frames[currentFrameIndex];
-    if (!f) {
-        stopPlayback();
-        return;
-    }
-
-    const elapsedForCut = getElapsedInFrame(elapsed, currentFrameIndex);
+    if (!f) { stopPlayback(); return; }
 
     const img = new Image();
     img.onload = () => {
         pctx.clearRect(0, 0, preview.width, preview.height);
-        try {
-          pctx.drawImage(img, 0, 0, preview.width, preview.height);
-        } catch (e) {}
-        // Aktifkan kembali guides untuk playback karena tidak lagi "terpanggang"
+        try { pctx.drawImage(img, 0, 0, preview.width, preview.height); } catch (e) {}
         try { drawGuides(pctx, preview.width, preview.height); } catch(e) {}
-        // overlay (time/title/desc)
         drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
         rafId = requestAnimationFrame(playbackLoop);
     };
@@ -3258,6 +3333,7 @@ function startPlayback() {
     if (pausedTime === 0) {
         currentFrameIndex = -1;
     }
+    try { setPlayheadFromElapsedMs(0); } catch(_){}
     playbackLoop();
 }
 
@@ -3290,6 +3366,7 @@ function stopPlayback() {
     pausedTime = 0;
     currentFrameIndex = -1;
     playBtn.innerHTML = "<i class='bx bx-play'></i> Play";
+    try { setPlayheadFromElapsedMs(0); } catch(_){}
     
     // Stop musik saat playback di-stop
     if (musicAudio) {
@@ -3457,6 +3534,7 @@ if (restartBtn) {
   restartBtn.addEventListener('click', () => {
     pausedTime = 0;
     currentFrameIndex = -1;
+    try { setPlayheadFromElapsedMs(0); } catch(_){}
     if (!playing) startPlayback();
     else playStartTime = performance.now();
   });
@@ -3835,6 +3913,518 @@ function getMusicDisplayName(frame) {
   return 'Audio';
 }
 
+// ===== Timeline module (Flash/Animate-like) =====
+const tl = {
+  canvas: null,
+  ctx: null,
+  scroller: null,
+  zoom: 0.6,            // default zoomed out
+  basePxPerFrame: 6,    // compact grid
+  rowHeight: 24,
+  headerH: 56,
+  gutterW: 100,
+  bottomPad: 12,
+  selection: new Set(),
+  drag: null,
+  playhead: 0,
+  flashIndex: -1,
+  flashUntil: 0,
+  moveAnim: null,
+  get pxPerFrame() { return this.basePxPerFrame * this.zoom; },
+  dpr: 1,
+};
+
+function computeFramePositions(){
+  const map = new Map();
+  let cursor = tl.gutterW;
+  for (let i=0;i<state.frames.length;i++){
+    map.set(state.frames[i], cursor);
+    const dur = Math.max(1, safeNumber(state.frames[i]?.duration, state.defaultDuration));
+    cursor += dur * tl.pxPerFrame;
+  }
+  return map;
+}
+
+function getTimelineTotalFrames(){
+  const fps = Math.max(1, state.fps||24);
+  const total = (state.frames && state.frames.length)
+    ? state.frames.reduce((sum, fr) => sum + Math.max(1, safeNumber(fr?.duration, state.defaultDuration)), 0)
+    : fps * 10; // show 10 seconds grid when empty
+  return Math.max(1, total);
+}
+
+(function initTimeline(){
+  tl.canvas = document.getElementById('timelineCanvas');
+  tl.scroller = document.getElementById('timelineScroller');
+  if (!tl.canvas || !tl.scroller) return;
+  tl.ctx = tl.canvas.getContext('2d');
+  setTimelineSize();
+  wireTimelineEvents();
+  updateTlScaleText();
+  renderTimeline();
+})();
+
+function setTimelineSize(){
+  if (!tl.canvas) return;
+  const totalFramesCount = getTimelineTotalFrames();
+  const computedWidth = Math.ceil(tl.gutterW + totalFramesCount * tl.pxPerFrame + 120);
+  const viewportMin = Math.max(900, (tl.scroller && tl.scroller.clientWidth) ? tl.scroller.clientWidth : 0);
+  const cssWidth = Math.max(computedWidth, viewportMin);
+  const cssHeight = tl.headerH + tl.rowHeight * 1 + 12 + tl.bottomPad;
+  const ctx = tl.canvas.getContext('2d');
+  tl.canvas.width = cssWidth;
+  tl.canvas.height = cssHeight;
+  tl.canvas.style.width = cssWidth + 'px';
+  tl.canvas.style.height = cssHeight + 'px';
+  // render in CSS pixel units (no DPR scaling) to avoid distortion
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  tl.ctx = ctx; // ensure reference is up to date
+}
+
+function updateTlScaleText(){
+  const el = document.getElementById('tlScaleText');
+  if (el) el.textContent = `${(tl.pxPerFrame).toFixed(1)} px/frame`;
+  updateTimecode();
+}
+
+function formatTimecode(frames, fps){
+  const totalFrames = Math.max(0, Math.floor(frames));
+  const ff = totalFrames % fps;
+  const totalSec = Math.floor(totalFrames / fps);
+  const ss = totalSec % 60;
+  const mm = Math.floor((totalSec / 60)) % 60;
+  const hh = Math.floor(totalSec / 3600);
+  const z = n => String(n).padStart(2,'0');
+  return `${z(hh)}:${z(mm)}:${z(ss)}:${z(ff)} / ${z(ff)}f`;
+}
+
+function updateTimecode(){
+  const t = document.getElementById('tlTimecode');
+  if (!t) return;
+  const fps = Math.max(1, state.fps||24);
+  t.textContent = formatTimecode(tl.playhead, fps);
+}
+
+function renderTimeline(){
+  if (!tl.ctx) return;
+  setTimelineSize();
+  const ctx = tl.ctx;
+  const w = tl.canvas.width, h = tl.canvas.height;
+  ctx.clearRect(0,0,w,h);
+  updateTimecode();
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#0d0f13';
+  ctx.fillRect(0,0,w,h);
+  ctx.fillStyle = '#161616';
+  ctx.fillRect(tl.gutterW,0,w-tl.gutterW,tl.headerH);
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.beginPath(); ctx.moveTo(0, tl.headerH+0.5); ctx.lineTo(w, tl.headerH+0.5); ctx.stroke();
+
+  const fps = Math.max(1, state.fps||24);
+  const pxpf = tl.pxPerFrame;
+  const totalFrames = getTimelineTotalFrames();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.015)';
+  ctx.fillRect(tl.gutterW, tl.headerH, w - tl.gutterW, h - tl.headerH);
+  for (let f = 0; f <= totalFrames; f++){
+    const x = Math.round(tl.gutterW + f * pxpf) + 0.5;
+    let alpha = 0.06;
+    if (f % fps === 0) { alpha = 0.25; }
+    else if (f % 10 === 0) { alpha = 0.16; }
+    else if (f % 5 === 0) { alpha = 0.10; }
+    ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+    ctx.beginPath(); ctx.moveTo(x, tl.headerH); ctx.lineTo(x, h); ctx.stroke();
+    if (f % fps === 0) {
+      ctx.fillStyle = '#9aa3b2';
+      ctx.font = '12px Segoe UI, Roboto, system-ui, sans-serif';
+      const sec = f / fps;
+      ctx.fillText(String(sec), Math.round(x + 8), 22);
+    }
+  }
+
+  ctx.fillStyle = '#141414';
+  ctx.fillRect(0,0,tl.gutterW,h);
+  ctx.fillStyle = '#e6eef8';
+  ctx.font = '11px Segoe UI, Roboto, system-ui, sans-serif';
+  ctx.fillText('Frames', 10, tl.headerH + (tl.rowHeight-11)/2 + 1);
+
+  // compute current playing index from playhead
+  let playingIdx = -1;
+  if (playing) { playingIdx = frameIndexFromAbsFrame(Math.max(0, Math.floor(tl.playhead))); }
+
+  // prepare position maps for animation
+  const now = performance.now();
+  const anim = tl.moveAnim;
+  const toMap = anim && anim.toMap ? anim.toMap : computeFramePositions();
+  const t = anim ? Math.min(1, (now - anim.start) / Math.max(1, anim.duration)) : 1;
+
+  for (let i=0;i<state.frames.length;i++){
+    const f = state.frames[i];
+    const dur = Math.max(1, safeNumber(f?.duration, state.defaultDuration));
+    const spanW = dur * pxpf;
+    const y = tl.headerH + 2;
+    const height = tl.rowHeight - 4;
+
+    const toX = toMap.get(f) ?? tl.gutterW;
+    const fromX = anim && anim.fromMap ? (anim.fromMap.get(f) ?? toX) : toX;
+    const startX = fromX + (toX - fromX) * t;
+
+    const hasThumb = !!f?.thumb;
+    if (hasThumb) {
+      ctx.fillStyle = 'rgba(154,163,178,0.12)';
+      ctx.fillRect(Math.floor(startX)+0.5, y, Math.floor(spanW), height);
+    } else {
+      const step = Math.max(4, Math.floor(pxpf));
+      ctx.save();
+      ctx.beginPath(); ctx.rect(Math.floor(startX)+0.5, y, Math.floor(spanW), height); ctx.clip();
+      ctx.fillStyle = 'rgba(255,255,255,0.02)';
+      for (let xx = Math.floor(startX); xx < startX + spanW; xx += step*2) {
+        ctx.fillRect(xx, y, step, height);
+      }
+      ctx.restore();
+    }
+
+    // playing highlight (distinct from selection)
+    if (playing && i === playingIdx) {
+      ctx.save();
+      const pulse = 0.16 + 0.08 * Math.abs(Math.sin(now/180));
+      ctx.fillStyle = `rgba(217,250,0,${pulse})`;
+      ctx.fillRect(Math.floor(startX)+0.5, y, Math.floor(spanW), height);
+      ctx.restore();
+    }
+
+    // outline for span
+    ctx.strokeStyle = tl.selection.has(i) ? 'rgba(217,250,0,0.85)' : 'rgba(255,255,255,0.35)';
+    ctx.strokeRect(Math.floor(startX)+0.5, y, Math.floor(spanW), height);
+
+    // keyframe dot at start
+    ctx.fillStyle = '#e6eef8';
+    ctx.beginPath(); ctx.arc(startX + 4, y + height/2 + 1, 2, 0, Math.PI*2); ctx.fill();
+
+    // index label
+    ctx.fillStyle = '#9aa3b2';
+    ctx.font = '11px Segoe UI, Roboto, system-ui, sans-serif';
+    ctx.fillText(String(i+1), startX + 8, y + height/2 + 5);
+
+    // flash on reorder drop
+    if (tl.flashIndex === i && tl.flashUntil > now) {
+      ctx.save();
+      const k = Math.max(0, (tl.flashUntil - now) / 450);
+      const a = 0.25 * k;
+      ctx.strokeStyle = `rgba(217,250,0,${Math.min(0.45, 0.2 + a)})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(Math.floor(startX)+0.5, y, Math.floor(spanW), height);
+      ctx.restore();
+    }
+  }
+
+  // playhead
+  const phx = tl.gutterW + tl.playhead * pxpf;
+  ctx.strokeStyle = 'var(--accent)';
+  ctx.beginPath(); ctx.moveTo(Math.round(phx) + 0.5, 0); ctx.lineTo(Math.round(phx) + 0.5, h); ctx.stroke();
+  ctx.fillStyle = 'var(--accent)';
+  ctx.beginPath(); ctx.moveTo(Math.round(phx)-4, 0); ctx.lineTo(Math.round(phx)+4, 0); ctx.lineTo(Math.round(phx), 6); ctx.closePath(); ctx.fill();
+}
+
+function ensurePlayheadVisible(){
+  if (!tl.scroller) return;
+  const viewportW = tl.scroller.clientWidth;
+  const left = tl.scroller.scrollLeft;
+  const phxCss = tl.gutterW + tl.playhead * tl.pxPerFrame;
+  const margin = 40; // keep some headroom
+  if (phxCss > left + viewportW - margin) {
+    tl.scroller.scrollLeft = phxCss - viewportW + margin;
+  } else if (phxCss < left + margin) {
+    tl.scroller.scrollLeft = Math.max(0, phxCss - margin);
+  }
+}
+
+function timelinePosToFrame(px){
+  return Math.max(0, Math.round((px - tl.gutterW) / tl.pxPerFrame));
+}
+
+function frameIndexAtX(px){
+  let cursor = tl.gutterW;
+  for (let i=0;i<state.frames.length;i++){
+    const dur = Math.max(1, safeNumber(state.frames[i]?.duration, state.defaultDuration));
+    const next = cursor + dur * tl.pxPerFrame;
+    if (px >= cursor && px < next) return { index: i, startX: cursor, endX: next, dur };
+    cursor = next;
+  }
+  return null;
+}
+
+function frameIndexFromAbsFrame(absFrame){
+  let acc = 0;
+  for (let i=0;i<state.frames.length;i++){
+    const dur = Math.max(1, state.frames[i].duration);
+    if (absFrame < acc + dur) return i;
+    acc += dur;
+  }
+  return state.frames.length ? state.frames.length - 1 : -1;
+}
+
+function wireTimelineEvents(){
+  const c = tl.canvas; if (!c) return;
+
+  const zi = document.getElementById('tlZoomIn');
+  const zo = document.getElementById('tlZoomOut');
+  zi && zi.addEventListener('click', ()=>{ tl.zoom = Math.min(8, tl.zoom*1.25); updateTlScaleText(); renderTimeline(); });
+  zo && zo.addEventListener('click', ()=>{ tl.zoom = Math.max(0.25, tl.zoom/1.25); updateTlScaleText(); renderTimeline(); });
+
+  c.addEventListener('mousedown', (e)=>{
+    const rect = c.getBoundingClientRect();
+    const x = (e.clientX - rect.left);
+    const y = (e.clientY - rect.top);
+
+    // if grabbing near playhead anywhere -> scrub
+    const phx = tl.gutterW + tl.playhead * tl.pxPerFrame;
+    if (Math.abs(x - phx) <= 6) {
+      tl.drag = { type:'scrub', startX:x };
+      c.style.cursor = 'ew-resize';
+      return;
+    }
+
+    // header scrub
+    if (y <= tl.headerH){
+      tl.drag = { type:'scrub', startX:x };
+      tl.playhead = Math.max(0, timelinePosToFrame(x));
+      seekToPlayhead();
+      ensurePlayheadVisible();
+      updatePausedFromPlayhead();
+      renderTimeline();
+      c.style.cursor = 'ew-resize';
+      return;
+    }
+
+    // if no frames or clicking outside spans: map to nearest frame index
+    if (!state.frames.length || !frameIndexAtX(x)){
+      const absF = timelinePosToFrame(x);
+      const idx = frameIndexFromAbsFrame(absF);
+      if (idx >= 0){
+        if (e.shiftKey && state.selected >= 0){
+          const start = Math.min(state.selected, idx);
+          const end = Math.max(state.selected, idx);
+          tl.selection.clear();
+          for (let k=start;k<=end;k++) tl.selection.add(k);
+        } else {
+          tl.selection = new Set([idx]);
+        }
+        try { selectFrame(idx, e); } catch(_){ }
+        // also move playhead to clicked position
+        tl.playhead = absF;
+        ensurePlayheadVisible();
+        updatePausedFromPlayhead();
+        renderTimeline();
+      }
+      return;
+    }
+
+    const hit = frameIndexAtX(x);
+    const edgeThreshold = 6;
+    const nearEnd = Math.abs(x - hit.endX) <= edgeThreshold;
+    const nearStart = Math.abs(x - hit.startX) <= edgeThreshold;
+
+    // Resize rule: only right edge; require selected OR hold Shift for direct
+    if (nearEnd && (tl.selection.has(hit.index) || e.shiftKey)){
+       tl.drag = { type:'resize', frameIndex: hit.index, edge: 'end', startX: x, origDur: hit.dur };
+       // if shift-resize, do not change selection; otherwise keep selection as-is
+       if (!tl.selection.has(hit.index) && !e.shiftKey){
+         try { selectFrame(hit.index, e); } catch(_){}
+       }
+       c.style.cursor = 'ew-resize';
+       return;
+     }
+
+    // range select with Shift-click (not resizing)
+    if (e.shiftKey && state.selected >= 0){
+      const start = Math.min(state.selected, hit.index);
+      const end = Math.max(state.selected, hit.index);
+      tl.selection.clear();
+      for (let k=start;k<=end;k++) tl.selection.add(k);
+      try { selectFrame(hit.index, e); } catch(_){ }
+      renderTimeline();
+      return;
+    }
+
+    // normal select then drag/copy
+    if (!tl.selection.has(hit.index)){
+      if (!e.ctrlKey) tl.selection.clear();
+      tl.selection.add(hit.index);
+      try { selectFrame(hit.index, e); } catch(_){}
+      renderTimeline();
+    }
+    if (e.altKey) {
+      tl.drag = { type:'copy', fromIndex: hit.index, startX: x, dropIndex: hit.index };
+      c.style.cursor = 'move';
+    } else {
+      tl.drag = { type:'move', frameIndex: hit.index, startX: x, origIndex: hit.index };
+      c.style.cursor = 'move';
+    }
+  });
+
+  window.addEventListener('mousemove', (e)=>{
+    const rect = c.getBoundingClientRect();
+    const x = (e.clientX - rect.left);
+    if (!tl.drag){
+      // hover cursor feedback
+      const hit = frameIndexAtX(x);
+      if (hit){
+        const edgeThreshold = 6;
+        const nearEnd = Math.abs(x - hit.endX) <= edgeThreshold;
+        const nearStart = Math.abs(x - hit.startX) <= edgeThreshold;
+        if (nearEnd /* only right-edge resize */){
+          c.style.cursor = 'ew-resize';
+        } else {
+          c.style.cursor = 'move';
+        }
+      } else {
+        c.style.cursor = 'default';
+      }
+    }
+    if (!tl.drag) return;
+    
+    if (tl.drag.type === 'scrub'){
+      tl.playhead = Math.max(0, timelinePosToFrame(x));
+      seekToPlayhead();
+      ensurePlayheadVisible();
+      updatePausedFromPlayhead();
+      renderTimeline();
+      return;
+    }
+
+    if (tl.drag.type === 'resize'){
+      const idx = tl.drag.frameIndex;
+      const startAbs = state.frames.slice(0, idx).reduce((a,b)=> a + Math.max(1, b.duration), 0);
+      const newDurFrames = Math.max(1, Math.round(timelinePosToFrame(x) - startAbs));
+      state.frames[idx].duration = newDurFrames;
+      syncSidebarDuration(idx);
+      renderTimeline();
+      c.style.cursor = 'ew-resize';
+      return;
+    }
+
+    if (tl.drag.type === 'copy'){
+      const hit = frameIndexAtX(x);
+      tl.drag.dropIndex = hit ? hit.index : state.frames.length - 1;
+      c.style.cursor = 'move';
+      return;
+    }
+  });
+
+  window.addEventListener('mouseup', (e)=>{
+    if (!tl.drag) return;
+    const kind = tl.drag.type; const info = tl.drag; tl.drag = null;
+    const c = tl.canvas; if (c) c.style.cursor = 'default';
+    if (kind === 'scrub') return;
+    if (kind === 'copy'){
+      // animate copy insertion
+      let beforeMap = null; try { beforeMap = computeFramePositions(); } catch(_){}
+      const from = info.fromIndex;
+      const to = Math.min(state.frames.length, (info.dropIndex ?? from) + 1);
+      try { pushHistory(); } catch(_){ }
+      const clone = JSON.parse(JSON.stringify(state.frames[from]));
+      state.frames.splice(to, 0, clone);
+      renderList();
+      selectFrame(to);
+      saveAuto();
+      try { const afterMap = computeFramePositions(); tl.moveAnim = { fromMap: beforeMap || new Map(), toMap: afterMap, start: performance.now(), duration: 320 }; animateTimelineMove(); } catch(_){}
+      try { tl.flashIndex = to; tl.flashUntil = performance.now() + 450; animateTimelineFlash(); } catch(_){}
+    }
+    if (kind === 'move'){
+      const rect = tl.canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left);
+      const hit = frameIndexAtX(x);
+      const dropIndex = hit ? hit.index : state.frames.length - 1;
+      if (dropIndex !== undefined && dropIndex !== info.origIndex){
+        reorder(info.origIndex, dropIndex);
+        try { tl.flashIndex = dropIndex; tl.flashUntil = performance.now() + 450; animateTimelineFlash(); } catch(_){}
+      }
+    }
+    renderTimeline();
+  });
+
+  // Keyboard shortcuts in timeline area
+  window.addEventListener('keydown', (e)=>{
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='a'){
+      e.preventDefault();
+      tl.selection.clear();
+      for(let i=0;i<state.frames.length;i++) tl.selection.add(i);
+      try {
+        selectedFrames.clear();
+        for(let i=0;i<state.frames.length;i++) selectedFrames.add(i);
+        highlightSelected();
+      } catch(_){ }
+      renderTimeline();
+    }
+  });
+}
+
+function syncSidebarDuration(index){
+  renderList();
+  if (state.selected === index){
+    const parts = splitDurationFrames(state.frames[index].duration, state.fps);
+    durationSecInput.value = String(parts.sec);
+    durationFrmInput.value = String(parts.frm);
+  }
+  saveAuto();
+}
+
+function seekToPlayhead(){
+  let framesSoFar = 0;
+  for (let i=0;i<state.frames.length;i++){
+    const dur = Math.max(1, state.frames[i].duration);
+    if (tl.playhead < framesSoFar + dur){
+      selectFrame(i);
+      break;
+    }
+    framesSoFar += dur;
+  }
+}
+
+const origRenderList = renderList;
+renderList = function(){
+  origRenderList();
+  setTimelineSize();
+  renderTimeline();
+};
+
+fpsInput.addEventListener('change', ()=>{ setTimelineSize(); renderTimeline(); });
+
+function setPlayheadFromElapsedMs(ms){
+  tl.playhead = Math.round((ms * state.fps / 1000));
+  ensurePlayheadVisible();
+  renderTimeline();
+}
+// ... existing code ...
+
+function updatePausedFromPlayhead(){
+  try {
+    const fps = Math.max(1, state.fps || 24);
+    pausedTime = (tl.playhead / fps) * 1000; // resume starts from playhead
+    currentFrameIndex = -1; // force recalculation on next loop
+  } catch(_){}
+}
+
+// keep paused time consistent with playhead when fps changes
+fpsInput.addEventListener('change', ()=>{ updatePausedFromPlayhead(); updateTimecode(); });
+
+function animateTimelineFlash(){
+  if (!tl.canvas) return;
+  if (!tl.flashIndex || tl.flashUntil <= performance.now()) { renderTimeline(); return; }
+  renderTimeline();
+  requestAnimationFrame(animateTimelineFlash);
+}
+function animateTimelineMove(){
+  if (!tl.canvas) return;
+  const anim = tl.moveAnim;
+  if (!anim) { renderTimeline(); return; }
+  const now = performance.now();
+  if (now >= anim.start + anim.duration) { tl.moveAnim = null; renderTimeline(); return; }
+  renderTimeline();
+  requestAnimationFrame(animateTimelineMove);
+}
+// ... existing code ...
 </script>
 </body>
 </html>
