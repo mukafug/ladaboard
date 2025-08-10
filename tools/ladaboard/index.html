@@ -20,8 +20,6 @@
 -->
 <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/ffmpeg.min.js"></script>
-<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/util.min.js"></script>
 <style>
 :root{--bg:#0f1115;--panel:#141619;--muted:#9aa3b2;--accent:#d9fa00;--accent-2:#d9fa00;}
 *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,system-ui,Arial}
@@ -2550,7 +2548,7 @@ function blankImageData(w,h){ const c=document.createElement('canvas'); c.width=
     try {
       btn.disabled = true;
       btn.innerHTML = "<i class='bx bx-film'></i> Exporting...";
-      await exportVideoTwoPassWEBM(); // call the new export function
+      await exportVideo(); // Kembali menggunakan fungsi ekspor webm sederhana
     } catch (err) {
       alert('Export failed: ' + (err && err.message ? err.message : String(err)));
     } finally {
@@ -2705,104 +2703,8 @@ async function exportVideo(){
   download(sanitizeFilename((document.getElementById('projectTitle').value || 'storyboard')) + '.webm', blob);
 }
 
-// ---------- NEW: Export Video Two Pass WEBM System ----------
-async function exportVideoTwoPassWEBM() {
-  if (!state.frames.length) { alert('No frames'); return; }
 
-  const fps = state.fps || 24;
-  const offscreen = document.createElement('canvas');
-  offscreen.width = preview.width;
-  offscreen.height = preview.height;
-  const ctx = offscreen.getContext('2d');
 
-  // 1️⃣ Render Video tanpa audio
-  const chunks = [];
-  const stream = offscreen.captureStream(fps);
-  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
-  recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
-  recorder.start();
-
-  for (let f = 0; f < state.frames.length; f++) {
-    const frame = state.frames[f];
-    const img = await createBitmapFromSrc(frame.thumb);
-    ctx.clearRect(0, 0, offscreen.width, offscreen.height);
-    ctx.drawImage(img, 0, 0, offscreen.width, offscreen.height);
-    await new Promise(r => setTimeout(r, (frame.duration / fps) * 1000));
-  }
-
-  recorder.stop();
-  await new Promise(r => recorder.onstop = r);
-  const videoBlob = new Blob(chunks, { type: 'video/webm' });
-
-  // 2️⃣ Gabung semua musik jadi satu WAV
-  const audioCtx = new AudioContext();
-  const totalDur = state.frames.reduce((sum, f) => sum + (f.duration / fps), 0);
-  const audioBuffer = audioCtx.createBuffer(2, audioCtx.sampleRate * totalDur, audioCtx.sampleRate);
-
-  let offset = 0;
-  for (let f = 0; f < state.frames.length; f++) {
-    if (!state.frames[f].music) { offset += (state.frames[f].duration / fps); continue; }
-    const resp = await fetch(state.frames[f].music);
-    const buf = await resp.arrayBuffer();
-    const decoded = await audioCtx.decodeAudioData(buf);
-    for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
-      audioBuffer.getChannelData(ch).set(decoded.getChannelData(ch), offset * audioCtx.sampleRate);
-    }
-    offset += (state.frames[f].duration / fps);
-  }
-
-  const audioBlob = bufferToWav(audioBuffer);
-
-  // 3️⃣ Mux Video + Audio
-  const { createFFmpeg, fetchFile } = FFmpeg;
-  const ffmpeg = createFFmpeg({ log: true });
-  await ffmpeg.load();
-  ffmpeg.FS('writeFile', 'video.webm', await fetchFile(videoBlob));
-  ffmpeg.FS('writeFile', 'audio.wav', await fetchFile(audioBlob));
-  await ffmpeg.run('-i', 'video.webm', '-i', 'audio.wav', '-c:v', 'copy', '-c:a', 'libopus', 'output.webm');
-
-  const data = ffmpeg.FS('readFile', 'output.webm');
-  const finalBlob = new Blob([data.buffer], { type: 'video/webm' });
-  const url = URL.createObjectURL(finalBlob);
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'ladaboard.webm';
-  a.click();
-}
-
-// Helper: Convert AudioBuffer → WAV Blob
-function bufferToWav(abuffer) {
-  const numOfChan = abuffer.numberOfChannels,
-        length = abuffer.length * numOfChan * 2 + 44,
-        buffer = new ArrayBuffer(length),
-        view = new DataView(buffer),
-        channels = [],
-        sampleRate = abuffer.sampleRate;
-
-  let offset = 0;
-  function setUint16(data) { view.setUint16(offset, data, true); offset += 2; }
-  function setUint32(data) { view.setUint32(offset, data, true); offset += 4; }
-  function writeString(s) { for (let i = 0; i < s.length; i++) view.setUint8(offset++, s.charCodeAt(i)); }
-
-  writeString('RIFF'); setUint32(length - 8); writeString('WAVE');
-  writeString('fmt '); setUint32(16); setUint16(1); setUint16(numOfChan);
-  setUint32(sampleRate); setUint32(sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16);
-  writeString('data'); setUint32(length - offset - 4);
-  for (let ch = 0; ch < numOfChan; ch++) channels.push(abuffer.getChannelData(ch));
-  const interleaved = interleave(channels[0], channels[1]);
-  let idx = 0;
-  while (offset < length) { view.setInt16(offset, interleaved[idx++] * 0x7FFF, true); offset += 2; }
-  return new Blob([buffer], { type: 'audio/wav' });
-}
-
-function interleave(a, b) {
-  const len = a.length + b.length;
-  const result = new Float32Array(len);
-  let i = 0, j = 0;
-  while (i < a.length && j < b.length) { result[i + j] = a[i]; result[i + j + 1] = b[j]; i++; j++; }
-  return result;
-}
 
 // playback engine (unchanged)
 let playing = false;
