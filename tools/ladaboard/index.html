@@ -3213,6 +3213,7 @@ let insertTransform = {
   startState: null
 };
 let suppressInsertOverlay = false;
+const HANDLE = { corner: 14, edge: 12, rotRadius: 8, rotOffset: 28 };
 
 const addImageBtn = document.getElementById('addImageBtn');
 const applyImageBtn = document.getElementById('applyImageBtn');
@@ -3286,15 +3287,18 @@ function hitHandle(p) {
   const w = width, h = height;
   const near = (ax,ay, bx,by, s)=> Math.abs(ax-bx)<=s && Math.abs(ay-by)<=s;
   // corners -> scale
-  if (near(lx,ly, -w/2, -h/2, 10)) return {mode:'scale', corner:'tl'};
-  if (near(lx,ly,  w/2, -h/2, 10)) return {mode:'scale', corner:'tr'};
-  if (near(lx,ly,  w/2,  h/2, 10)) return {mode:'scale', corner:'br'};
-  if (near(lx,ly, -w/2,  h/2, 10)) return {mode:'scale', corner:'bl'};
-  if (Math.hypot(lx-0, ly-(-h/2-24)) <= 12) return {mode:'rotate'};
-  if (near(lx,ly, 0, -h/2, 12)) return {mode:'skewY', edge:'top'};
-  if (near(lx,ly,  w/2, 0, 12)) return {mode:'skewX', edge:'right'};
-  if (near(lx,ly, 0,  h/2, 12)) return {mode:'skewY', edge:'bottom'};
-  if (near(lx,ly, -w/2, 0, 12)) return {mode:'skewX', edge:'left'};
+  if (near(lx,ly, -w/2, -h/2, HANDLE.corner)) return {mode:'scale', corner:'tl'};
+  if (near(lx,ly,  w/2, -h/2, HANDLE.corner)) return {mode:'scale', corner:'tr'};
+  if (near(lx,ly,  w/2,  h/2, HANDLE.corner)) return {mode:'scale', corner:'br'};
+  if (near(lx,ly, -w/2,  h/2, HANDLE.corner)) return {mode:'scale', corner:'bl'};
+  // rotation handle near top center
+  if (Math.hypot(lx-0, ly-(-h/2-HANDLE.rotOffset)) <= HANDLE.rotRadius + 4) return {mode:'rotate'};
+  // skew handles mid edges
+  if (near(lx,ly, 0, -h/2, HANDLE.edge)) return {mode:'skewY', edge:'top'};
+  if (near(lx,ly,  w/2, 0, HANDLE.edge)) return {mode:'skewX', edge:'right'};
+  if (near(lx,ly, 0,  h/2, HANDLE.edge)) return {mode:'skewY', edge:'bottom'};
+  if (near(lx,ly, -w/2, 0, HANDLE.edge)) return {mode:'skewX', edge:'left'};
+  // inside rect -> move
   if (lx>=-w/2 && lx<=w/2 && ly>=-h/2 && ly<=h/2) return {mode:'move'};
   return null;
 }
@@ -3392,15 +3396,29 @@ if (cancelBtn) cancelBtn.addEventListener('click', ()=>{
         insertTransform.y = s.y + dy;
         break;
       case 'scale': {
-        const factor = 1 + (dx + dy) / 300;
-        insertTransform.scaleX = Math.max(0.05, s.scaleX * factor);
-        insertTransform.scaleY = Math.max(0.05, s.scaleY * factor);
+        const corner = insertTransform.dragModeCorner || 'br';
+        const signX = (corner === 'tr' || corner === 'br') ? 1 : -1;
+        const signY = (corner === 'bl' || corner === 'br') ? 1 : -1;
+        let factorX = 1 + (dx * signX) / 300;
+        let factorY = 1 + (dy * signY) / 300;
+        if (e.shiftKey) {
+          const delta = Math.abs(dx) > Math.abs(dy) ? dx * signX : dy * signY;
+          const f = 1 + delta / 300;
+          factorX = f; factorY = f;
+        }
+        insertTransform.scaleX = Math.max(0.05, s.scaleX * factorX);
+        insertTransform.scaleY = Math.max(0.05, s.scaleY * factorY);
         break;
       }
       case 'rotate': {
         const angle0 = Math.atan2(insertTransform.startPointer.y - s.y, insertTransform.startPointer.x - s.x);
-        const angle1 = Math.atan2(p.y - s.y, p.x - s.x);
-        insertTransform.rotation = s.rotation + (angle1 - angle0);
+        let angle1 = Math.atan2(p.y - s.y, p.x - s.x);
+        let newAngle = s.rotation + (angle1 - angle0);
+        if (e.shiftKey) {
+          const step = Math.PI / 12; // 15°
+          newAngle = Math.round(newAngle / step) * step;
+        }
+        insertTransform.rotation = newAngle;
         break;
       }
       case 'skewX': {
@@ -3434,7 +3452,6 @@ function drawTransformedImageOverlay() {
     return;
   }
   ictx.clearRect(0,0,insertCanvas.width,insertCanvas.height);
-  // draw onto overlay ictx
   const ctx = ictx;
   const cx = insertTransform.x;
   const cy = insertTransform.y;
@@ -3447,7 +3464,7 @@ function drawTransformedImageOverlay() {
   ctx.scale(insertTransform.scaleX, insertTransform.scaleY);
   ctx.drawImage(insertImage, -w/2, -h/2, w, h);
   ctx.restore();
-  // handles
+  // Handles + bbox
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(insertTransform.rotation);
@@ -3459,28 +3476,20 @@ function drawTransformedImageOverlay() {
   ctx.strokeRect(-w/2, -h/2, w, h);
   ctx.setLineDash([]);
   ctx.fillStyle = '#39f';
+  const halfCorner = HANDLE.corner / 2;
   [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].forEach(([hx,hy])=>{
-    ctx.fillRect(hx-5, hy-5, 10, 10);
+    ctx.fillRect(hx-halfCorner, hy-halfCorner, HANDLE.corner, HANDLE.corner);
   });
-  ctx.beginPath(); ctx.arc(0, -h/2-24, 6, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0, -h/2-HANDLE.rotOffset, HANDLE.rotRadius, 0, Math.PI*2);
+  ctx.fill();
   ctx.fillStyle = '#9cf';
-  [[0,-h/2],[w/2,0],[0,h/2],[-w/2,0]].forEach(([hx,hy])=>{ ctx.fillRect(hx-6, hy-6, 12, 12); });
+  const halfEdge = HANDLE.edge / 2;
+  [[0,-h/2],[w/2,0],[0,h/2],[-w/2,0]].forEach(([hx,hy])=>{
+    ctx.fillRect(hx-halfEdge, hy-halfEdge, HANDLE.edge, HANDLE.edge);
+  });
   ctx.restore();
 }
-
-// ensure overlays keep size in sync
-function syncOverlaySizes() {
-  onionCanvas.width = drawCanvas.width; onionCanvas.height = drawCanvas.height;
-  guideCanvas.width = drawCanvas.width; guideCanvas.height = drawCanvas.height;
-  insertCanvas.width = drawCanvas.width; insertCanvas.height = drawCanvas.height;
-}
-
-// Replace previous redraw augmentation
-const _oldRedrawPaths = redrawPaths;
-redrawPaths = function(){
-  _oldRedrawPaths();
-  drawTransformedImageOverlay();
-};
 // ... existing code ...
 
 // ... existing code ...
