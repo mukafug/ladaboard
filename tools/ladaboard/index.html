@@ -1078,18 +1078,33 @@ function pad2(n){ return String(n).padStart(2,'0'); }
 function wrapText(ctx, text, maxWidth) {
   const words = String(text || '').split(/\s+/);
   const lines = [];
-  let cur = '';
-  for (let w of words) {
-    const test = cur ? cur + ' ' + w : w;
-    if (ctx.measureText(test).width <= maxWidth) {
-      cur = test;
+  let currentLine = '';
+  
+  // Variabel baru untuk melacak lebar maksimum yang terukur
+  let measuredMaxWidth = 0;
+
+  for (let word of words) {
+    const testLine = currentLine ? currentLine + ' ' + word : word;
+    const metrics = ctx.measureText(testLine);
+    
+    if (metrics.width > maxWidth && currentLine !== '') {
+      lines.push(currentLine);
+      // Perbarui lebar maksimal dengan lebar baris saat ini
+      measuredMaxWidth = Math.max(measuredMaxWidth, ctx.measureText(currentLine).width);
+      currentLine = word;
     } else {
-      if (cur) lines.push(cur);
-      cur = w;
+      currentLine = testLine;
     }
   }
-  if (cur) lines.push(cur);
-  return { lines };
+  
+  if (currentLine) {
+    lines.push(currentLine);
+    // Perbarui lebar maksimal untuk baris terakhir
+    measuredMaxWidth = Math.max(measuredMaxWidth, ctx.measureText(currentLine).width);
+  }
+
+  // Kembalikan objek yang berisi 'lines' dan 'maxWidth' yang sudah dihitung
+  return { lines, maxWidth: measuredMaxWidth };
 }
 
 // --- Helper for creating bitmap from source ---
@@ -3107,3 +3122,4 @@ function handleMusicForFrame(frameIndex){
 </script>
 </body>
 </html>
+
