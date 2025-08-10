@@ -20,12 +20,32 @@
 -->
 <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/ffmpeg.min.js"></script>
+<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/util.min.js"></script>
 <style>
 :root{--bg:#0f1115;--panel:#141619;--muted:#9aa3b2;--accent:#d9fa00;--accent-2:#d9fa00;}
 *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,system-ui,Arial}
 html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0e 0%, #0f1115 100%);color:#e6eef8}
-.app{display:grid;grid-template-columns:360px 1fr;gap:18px;padding:18px;height:100vh}
-.sidebar{background:var(--panel);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+.app {
+  display: flex; /* ubah dari grid ke flexbox */
+  gap: 18px;
+  padding: 18px;
+  height: 100vh;
+  align-items: flex-start; /* penting untuk sticky positioning */
+}
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 360px; /* fixed width untuk sidebar */
+  flex-shrink: 0; /* mencegah sidebar menyusut */
+  height: 100vh; /* full height */
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 12px;
+  gap: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+  overflow: hidden; /* mencegah sidebar scroll */
+}
 .header{display:flex;gap:8px;align-items:center}
 .logo{padding:8px 12px;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:8px;font-weight:700;color:#000}
 .controls{display:flex;gap:8px;margin-left:auto}
@@ -36,7 +56,20 @@ html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0e 0%, #0f
 .mode-toggle .toggle-thumb{position:absolute;top:4px;left:4px;width:calc(50% - 0px);height:calc(100% - 8px);background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.35);transform:translateX(calc(var(--pos)*100%));transition:transform 220ms cubic-bezier(.2,.8,.2,1),width 220ms}
 .mode-toggle button{position:relative;z-index:1;background:transparent;border:none;cursor:pointer;padding:8px 14px;border-radius:8px;color:var(--muted);font-weight:700}
 .mode-toggle .active{color:#071017}
-.list{flex:1;overflow:auto;padding:6px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);border-radius:8px}
+.list {
+  flex: 1;
+  overflow-y: auto;       /* biar bisa digulir */
+  padding: 6px;
+  background: linear-gradient(180deg,rgba(255,255,255,0.01),transparent);
+  border-radius: 8px;
+  scroll-behavior: smooth; /* smooth scrolling */
+
+  /* sembunyikan scrollbar */
+  scrollbar-width: none;  /* Firefox */
+}
+.list::-webkit-scrollbar { 
+  display: none;          /* Chrome, Edge, Safari */
+}
 .frame{display:grid;grid-template-columns:56px 1fr 64px;gap:10px;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);margin-bottom:8px;border:1px solid rgba(255,255,255,0.02);transition: all 0.2s ease;}
 .frame.selected{background:rgba(217,250,0,0.08);border-color:var(--accent);}
 .frame.selected input:focus{background:rgba(255,255,255,0.1);}
@@ -44,9 +77,22 @@ html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0e 0%, #0f
 .meta{display:flex;flex-direction:column;gap:6px}
 .meta input[type=text]{width:100%;background:transparent;border:none;color:inherit;outline:none}
 .small{font-size:12px;color:var(--muted)}
-.side-right{background:var(--panel);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.canvas-stage{background:#050607;border-radius:8px;flex:1;display:flex;align-items:center;justify-content:center;position:relative}
-.canvas-stage canvas{max-width:100%;max-height:100%;background:#fff;border-radius:4px}
+.side-right {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 18px; /* biar nempel di atas */
+  flex: 1; /* ambil sisa ruang yang tersedia */
+  max-width: calc(100vw - 396px); /* 360px sidebar + 18px gap + 18px padding */
+  height: fit-content; /* tinggi sesuai konten */
+  overflow: visible; /* pastikan tidak ada overflow yang mengganggu sticky */
+}
+.canvas-stage{background:#050607;border-radius:8px;aspect-ratio:16/9;width:100%;max-height:70vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.canvas-stage canvas{width:100%;height:100%;object-fit:contain;background:#000;border-radius:4px}
 .toolbar{display:flex;gap:8px;align-items:center}
 .input{padding:8px;border-radius:6px;background:#0b0c0d;border:1px solid rgba(255,255,255,0.03);color:var(--muted);font-family:inherit}
 .row{display:flex;gap:8px;align-items:center}
@@ -263,6 +309,60 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
 .submenu:hover .submenu-menu {
   display: block;
 }
+
+/* ---------- Frame list scrollable tanpa scrollbar (copy this) ---------- */
+/* Pastikan ini ada di dalam tag <style> di storyboard.html */
+
+/* Make sidebar column layout reliable */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* sekarang ikut .app yang fixed */
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 12px;
+  gap: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;       /* biar bisa digulir */
+  padding: 6px;
+  background: linear-gradient(180deg,rgba(255,255,255,0.01),transparent);
+  border-radius: 8px;
+
+  /* sembunyikan scrollbar */
+  scrollbar-width: none;  /* Firefox */
+}
+.list::-webkit-scrollbar { 
+  display: none;          /* Chrome, Edge, Safari */
+}
+
+/* Area kanan (toolbar + preview + footer) tetap di tempat (stay) */
+.side-right {
+  /* agar sticky bekerja, parent harus punya tinggi (app punya height:100vh di filemu) */
+  position: sticky;
+  top: 0;
+  align-self: start;  /* agar tidak mengisi baris vertikal fleksibel */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background:var(--panel);border-radius:10px;padding:14px
+}
+
+/* optional: membuat konten kanan tidak ikut mengkerut */
+.side-right > .canvas-stage,
+.side-right > .toolbar,
+.side-right > .footer {
+  flex-shrink: 0;
+}
+
+/* (opsional) smoother scroll behavior */
+.list {
+  scroll-behavior: smooth;
+}
+
 </style>
 </head>
 <body>
@@ -345,7 +445,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
       <div class="duration-group">
         <input id="durationSec" class="input" type="number" min="0" step="0.1" value="0" style="width:70px" autocomplete="off" />
         <span class="small-muted">s</span>
-        <input id="durationFrm" class="input" type="number" min="0" step="1" style="width:56px" value="${(function(){ const d=splitDurationFrames(safeNumber(f.duration,state.defaultDuration), state.fps); return d.frm; })()}" autocomplete="off" />
+        <input id="durationFrm" class="input" type="number" min="0" step="1" style="width:56px" value="" autocomplete="off" />
         <span class="small-muted">f</span>
       </div>
     </div>
@@ -809,21 +909,8 @@ function drawGuides(ctx, canvasW, canvasH) {
 
   ctx.save();
 
-  // outer artboard border
-  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([4,4]);
-  ctx.strokeRect(ox+0.5, oy+0.5, aw-1, ah-1);
-
-  // center lines
-  ctx.setLineDash([]);
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(ox + aw/2 + 0.5, oy); ctx.lineTo(ox + aw/2 + 0.5, oy + ah);
-  ctx.moveTo(ox, oy + ah/2 + 0.5); ctx.lineTo(ox + aw, oy + ah/2 + 0.5);
-  ctx.stroke();
-
+  // Hapus outer artboard border dan center lines - tidak diperlukan lagi
+  
   // safe areas
   const titlePadX = aw * ((100 - guidesState.titleSafePct) / 200); // symmetric inset
   const titlePadY = ah * ((100 - guidesState.titleSafePct) / 200);
@@ -850,62 +937,7 @@ function drawGuides(ctx, canvasW, canvasH) {
   ctx.fillStyle = 'rgba(90,200,180,0.95)';
   ctx.fillText('Action Safe ' + guidesState.actionSafePct + '%', ox + actionPadX + 8, oy + actionPadY + 14);
 
-  // rulers (top & left) if enabled
-  if (guidesState.rulers) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.65)';
-    ctx.fillStyle = 'rgba(255,255,255,0.65)';
-    ctx.lineWidth = 1;
-    ctx.font = '10px "Segoe UI", sans-serif';
-
-    // Decide tick spacing in artboard pixels (virtual). We'll display ticks every 100 virtual px scaled.
-    const virtualTickPx = 100; // every 100 virtual px
-    const tickScaled = virtualTickPx * scale;
-
-    // top ruler
-    for (let x = 0; x <= aw; x += tickScaled) {
-      const posX = ox + x;
-      const v = Math.round(x / scale); // virtual px
-      // major tick
-      ctx.beginPath();
-      ctx.moveTo(posX + 0.5, oy - 1);
-      ctx.lineTo(posX + 0.5, oy - 8);
-      ctx.stroke();
-      ctx.fillText(String(v), posX + 3, oy - 18);
-      // minor ticks: every quarter
-      for (let m = 1; m < 4; m++) {
-        const subX = posX + (tickScaled * m / 4);
-        if (subX > ox + aw) break;
-        ctx.beginPath();
-        ctx.moveTo(subX + 0.5, oy - 1);
-        ctx.lineTo(subX + 0.5, oy - 5);
-        ctx.stroke();
-      }
-    }
-
-    // left ruler
-    for (let y = 0; y <= ah; y += tickScaled) {
-      const posY = oy + y;
-      const v = Math.round(y / scale); // virtual px
-      ctx.beginPath();
-      ctx.moveTo(ox - 1, posY + 0.5);
-      ctx.lineTo(ox - 8, posY + 0.5);
-      ctx.stroke();
-      ctx.save();
-      ctx.translate(ox - 20, posY + 4);
-      ctx.rotate(-Math.PI/2);
-      ctx.fillText(String(v), 0, 0);
-      ctx.restore();
-      // minor ticks
-      for (let m = 1; m < 4; m++) {
-        const subY = posY + (tickScaled * m / 4);
-        if (subY > oy + ah) break;
-        ctx.beginPath();
-        ctx.moveTo(ox - 1, subY + 0.5);
-        ctx.lineTo(ox - 5, subY + 0.5);
-        ctx.stroke();
-      }
-    }
-  }
+  // Hapus seluruh bagian rulers - tidak diperlukan lagi
 
   ctx.restore();
 }
@@ -1317,6 +1349,10 @@ function renderList(){
         state.frames[i].desc = ev.target.value;
         if (i === state.selected) descInput.value = ev.target.value;
         saveAuto();
+        // Update preview secara real-time jika frame yang diedit adalah yang sedang dipilih
+        if (i === state.selected) {
+          drawPreview();
+        }
       });
     }
 
@@ -1654,8 +1690,8 @@ function drawPreview(){
     const img = new Image(); 
     img.onload = ()=>{
       drawImageCover(pctx,img,preview.width,preview.height); 
-      // Preview tidak menampilkan onion skin - hanya gambar utama
-      // drawGuides(pctx, preview.width, preview.height); // REMOVED: causes duplication
+      // Tambahkan guides untuk mode Upload juga
+      drawGuides(pctx, preview.width, preview.height);
       drawOverlayCanvas('Cut no. ' + (sel+1), 0); 
     }; 
     img.onerror = ()=>{ 
@@ -1993,24 +2029,20 @@ function redrawPaths(){
   // determine reference index (use editIndex for edits, or end of list for new frames)
   const refIndex = (typeof editIndex === 'number' && editIndex !== null) ? editIndex : state.frames.length;
   
-  // draw base image (if any) - gambar utama tanpa onion skin
+  // draw base image (if any)
   if(baseImage){
     dctx.save();
     try{ drawImageCover(dctx, baseImage, drawCanvas.width, drawCanvas.height); }catch(e){}
     dctx.restore();
   }
   
-  // Draw guides
-  drawGuides(dctx, drawCanvas.width, drawCanvas.height);
-  
-  // Note: All drawing is now done directly on the canvas and managed through the bitmap history system
-  // The canvas state is restored from drawingHistory[currentHistoryIndex] when needed
+  // HAPUS ATAU BERI KOMENTAR PADA BARIS INI
+  // drawGuides(dctx, drawCanvas.width, drawCanvas.height);
   
   // Render onion skin overlay di canvas terpisah
   if (drawDialog.classList.contains('open')) {
     renderOnionSkinsOverlay(refIndex);
   } else {
-    // Clear onion skin overlay jika tidak dalam mode edit/draw
     octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
   }
 }
@@ -2231,7 +2263,15 @@ document.getElementById('removeFrame').addEventListener('click', () => deleteSel
 // fps & durations
 fpsInput.addEventListener('change',e=>{ state.fps = Math.max(1, Number(e.target.value)||24); fpsBadge.textContent = state.fps + ' FPS'; saveAuto(); updateProjectInfo(); renderList(); if(state.selected>=0){ const parts = splitDurationFrames(state.frames[state.selected].duration, state.fps); durationSecInput.value = String(parts.sec); durationFrmInput.value = String(parts.frm); } });
 defaultDurationInput.addEventListener('change',e=>{ state.defaultDuration = Math.max(1, Number(e.target.value)||24); });
-descInput.addEventListener('input',e=>{ if(state.selected>=0 && state.frames[state.selected]){ state.frames[state.selected].desc = e.target.value; renderList(); saveAuto(); } });
+descInput.addEventListener('input',e=>{ 
+  if(state.selected>=0 && state.frames[state.selected]){ 
+    state.frames[state.selected].desc = e.target.value; 
+    renderList(); 
+    saveAuto(); 
+    // Update preview secara real-time saat deskripsi berubah
+    drawPreview();
+  } 
+});
 // replace old single duration input with dual inputs listeners
 function updateSelectedDurationFromSide(){
   if(state.selected>=0 && state.frames[state.selected]){
@@ -2482,13 +2522,13 @@ function blankImageData(w,h){ const c=document.createElement('canvas'); c.width=
   async function handleExportClick() {
     try {
       btn.disabled = true;
-      btn.innerHTML = "&lt;i class='bx bx-film'&gt;&lt;/i&gt; Exporting...";
-      await exportVideo(); // call the main export function (below)
+      btn.innerHTML = "<i class='bx bx-film'></i> Exporting...";
+      await exportVideoTwoPassWEBM(); // call the new export function
     } catch (err) {
       alert('Export failed: ' + (err && err.message ? err.message : String(err)));
     } finally {
       btn.disabled = false;
-      btn.innerHTML = "&lt;i class='bx bx-film'&gt;&lt;/i&gt; Export Video";
+      btn.innerHTML = "<i class='bx bx-film'></i> Export Video";
     }
   }
   // remove existing listeners safely (if any) and attach
@@ -2620,7 +2660,7 @@ async function exportVideo(){
     for (let ff = 0; ff < framesToShow; ff++) {
       ctx.clearRect(0,0,w,h);
       try { drawImageCover(ctx, img, w, h); } catch(e){}
-      try { drawGuides(ctx, w, h); } catch(e){}        // &lt;-- draw guides into exported frame
+      try { drawGuides(ctx, w, h); } catch(e){}        // <-- draw guides into exported frame
       drawOverlayForExport(ctx, cumulativeMs, i, w, h, state.fps || 24, f.desc || '');
       await waitMs(Math.round(frameMs));
       cumulativeMs += frameMs;
@@ -2637,6 +2677,106 @@ async function exportVideo(){
   const blob = new Blob(chunks, { type: mime });
   download(sanitizeFilename((document.getElementById('projectTitle').value || 'storyboard')) + '.webm', blob);
 }
+
+// ---------- NEW: Export Video Two Pass WEBM System ----------
+async function exportVideoTwoPassWEBM() {
+  if (!state.frames.length) { alert('No frames'); return; }
+
+  const fps = state.fps || 24;
+  const offscreen = document.createElement('canvas');
+  offscreen.width = preview.width;
+  offscreen.height = preview.height;
+  const ctx = offscreen.getContext('2d');
+
+  // 1️⃣ Render Video tanpa audio
+  const chunks = [];
+  const stream = offscreen.captureStream(fps);
+  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+  recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+  recorder.start();
+
+  for (let f = 0; f < state.frames.length; f++) {
+    const frame = state.frames[f];
+    const img = await createBitmapFromSrc(frame.thumb);
+    ctx.clearRect(0, 0, offscreen.width, offscreen.height);
+    ctx.drawImage(img, 0, 0, offscreen.width, offscreen.height);
+    await new Promise(r => setTimeout(r, (frame.duration / fps) * 1000));
+  }
+
+  recorder.stop();
+  await new Promise(r => recorder.onstop = r);
+  const videoBlob = new Blob(chunks, { type: 'video/webm' });
+
+  // 2️⃣ Gabung semua musik jadi satu WAV
+  const audioCtx = new AudioContext();
+  const totalDur = state.frames.reduce((sum, f) => sum + (f.duration / fps), 0);
+  const audioBuffer = audioCtx.createBuffer(2, audioCtx.sampleRate * totalDur, audioCtx.sampleRate);
+
+  let offset = 0;
+  for (let f = 0; f < state.frames.length; f++) {
+    if (!state.frames[f].music) { offset += (state.frames[f].duration / fps); continue; }
+    const resp = await fetch(state.frames[f].music);
+    const buf = await resp.arrayBuffer();
+    const decoded = await audioCtx.decodeAudioData(buf);
+    for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
+      audioBuffer.getChannelData(ch).set(decoded.getChannelData(ch), offset * audioCtx.sampleRate);
+    }
+    offset += (state.frames[f].duration / fps);
+  }
+
+  const audioBlob = bufferToWav(audioBuffer);
+
+  // 3️⃣ Mux Video + Audio
+  const { createFFmpeg, fetchFile } = FFmpeg;
+  const ffmpeg = createFFmpeg({ log: true });
+  await ffmpeg.load();
+  ffmpeg.FS('writeFile', 'video.webm', await fetchFile(videoBlob));
+  ffmpeg.FS('writeFile', 'audio.wav', await fetchFile(audioBlob));
+  await ffmpeg.run('-i', 'video.webm', '-i', 'audio.wav', '-c:v', 'copy', '-c:a', 'libopus', 'output.webm');
+
+  const data = ffmpeg.FS('readFile', 'output.webm');
+  const finalBlob = new Blob([data.buffer], { type: 'video/webm' });
+  const url = URL.createObjectURL(finalBlob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ladaboard.webm';
+  a.click();
+}
+
+// Helper: Convert AudioBuffer → WAV Blob
+function bufferToWav(abuffer) {
+  const numOfChan = abuffer.numberOfChannels,
+        length = abuffer.length * numOfChan * 2 + 44,
+        buffer = new ArrayBuffer(length),
+        view = new DataView(buffer),
+        channels = [],
+        sampleRate = abuffer.sampleRate;
+
+  let offset = 0;
+  function setUint16(data) { view.setUint16(offset, data, true); offset += 2; }
+  function setUint32(data) { view.setUint32(offset, data, true); offset += 4; }
+  function writeString(s) { for (let i = 0; i < s.length; i++) view.setUint8(offset++, s.charCodeAt(i)); }
+
+  writeString('RIFF'); setUint32(length - 8); writeString('WAVE');
+  writeString('fmt '); setUint32(16); setUint16(1); setUint16(numOfChan);
+  setUint32(sampleRate); setUint32(sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16);
+  writeString('data'); setUint32(length - offset - 4);
+  for (let ch = 0; ch < numOfChan; ch++) channels.push(abuffer.getChannelData(ch));
+  const interleaved = interleave(channels[0], channels[1]);
+  let idx = 0;
+  while (offset < length) { view.setInt16(offset, interleaved[idx++] * 0x7FFF, true); offset += 2; }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function interleave(a, b) {
+  const len = a.length + b.length;
+  const result = new Float32Array(len);
+  let i = 0, j = 0;
+  while (i < a.length && j < b.length) { result[i + j] = a[i]; result[i + j + 1] = b[j]; i++; j++; }
+  return result;
+}
+
 // playback engine (unchanged)
 let playing = false;
 let playStartTime = 0;
@@ -2710,8 +2850,8 @@ function playbackLoop() {
         try {
           pctx.drawImage(img, 0, 0, preview.width, preview.height);
         } catch (e) {}
-        // --- guides tidak ditampilkan saat playback untuk menghindari duplication ---
-        // try { drawGuides(pctx, preview.width, preview.height); } catch(e) {} // REMOVED: causes duplication
+        // Aktifkan kembali guides untuk playback karena tidak lagi "terpanggang"
+        try { drawGuides(pctx, preview.width, preview.height); } catch(e) {}
         // overlay (time/title/desc)
         drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
         rafId = requestAnimationFrame(playbackLoop);
