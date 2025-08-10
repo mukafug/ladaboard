@@ -4,6 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>LadaBoard - Storyboard Maker</title>
+<link rel="icon" type="image/x-icon" href="assets/ladaboard.ico" />
+<link rel="shortcut icon" href="assets/ladaboard.ico" />
 <!-- 
   STORYBOARD HTML - Onion Skin System
   
@@ -2602,7 +2604,7 @@ document.getElementById('saveProject').addEventListener('click', async ()=>{
 
     const json = JSON.stringify(project, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
-    download((document.getElementById('projectTitle').value||'LadaBoard')+'.json', blob);
+    download(sanitizeFilename(document.getElementById('projectTitle').value||'LadaBoard')+'.json', blob);
   } catch (err) {
     alert('Save failed: ' + (err && err.message ? err.message : String(err)));
   }
@@ -2640,6 +2642,7 @@ loadProjectInput.addEventListener('change', async (e)=>{
     state.fps = safeNumber(data.meta?.fps, state.fps);
     state.defaultDuration = safeNumber(data.meta?.defaultDuration, state.defaultDuration);
     document.getElementById('projectTitle').value = data.meta?.title || '';
+    try { document.title = (document.getElementById('projectTitle').value || 'LadaBoard - Storyboard Maker'); } catch(_) {}
     fpsInput.value = state.fps;
     fpsBadge.textContent = state.fps + ' FPS';
     defaultDurationInput.value = state.defaultDuration;
@@ -3203,6 +3206,7 @@ window.addEventListener('load',()=>{
   preview.height=720; 
   drawPreview(); 
   // Intro overlay logic removed
+  try { document.title = (document.getElementById('projectTitle').value || 'LadaBoard - Storyboard Maker'); } catch(_) {}
 });
 
 // helpers for renderList
@@ -3578,6 +3582,16 @@ function drawTransformedImageOnly(ctx) {
   ctx.restore();
 }
 // ... existing code ...
+
+// Persist project title immediately on edit and reflect to document.title
+(function bindProjectTitlePersistence(){
+  const titleEl = document.getElementById('projectTitle');
+  if (!titleEl) return;
+  const persist = ()=>{ saveAuto(); try { document.title = (titleEl.value || 'LadaBoard - Storyboard Maker'); } catch(_) {} };
+  titleEl.addEventListener('input', persist);
+  titleEl.addEventListener('change', persist);
+  titleEl.addEventListener('blur', persist);
+})();
 
 </script>
 </body>
