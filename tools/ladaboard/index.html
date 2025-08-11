@@ -598,7 +598,11 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
     </div>
 
     <div class="canvas-stage" id="stage">
-      <canvas id="preview" width="1280" height="720"></canvas>
+      <!-- External rulers for preview -->
+      <canvas id="previewRulerTop" style="position:absolute; left:22px; top:0; pointer-events:none; width:calc(100% - 22px); height:22px; background:transparent;"></canvas>
+      <canvas id="previewRulerLeft" style="position:absolute; left:0; top:22px; pointer-events:none; width:22px; height:calc(100% - 22px); background:transparent;"></canvas>
+      <div id="previewRulerCorner" style="position:absolute; left:0; top:0; width:22px; height:22px; background:rgba(0,0,0,0.55); pointer-events:none;"></div>
+      <canvas id="preview" width="1280" height="720" style="position:absolute; left:22px; top:22px; width:calc(100% - 22px); height:calc(100% - 22px);"></canvas>
     </div>
 
     <!-- NEW: Timeline container (Adobe Animate-like) -->
@@ -609,6 +613,32 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
           <span id="tlTimecode" class="small-muted" style="margin-left:8px; font-weight:700; letter-spacing:.3px;"></span>
           <button id="tlZoomOut" class="icon-btn" title="Zoom Out (-)"><i class='bx bx-zoom-out'></i></button>
           <button id="tlZoomIn" class="icon-btn" title="Zoom In (+)"><i class='bx bx-zoom-in'></i></button>
+        </div>
+        <!-- NEW: center controls for Onion Skin + Guides -->
+        <div class="tl-center" style="display:flex;align-items:center;gap:8px;flex:1;justify-content:center;">
+          <!-- Onion skin quick toggle + counts -->
+          <button id="tlToggleOnion" class="btn" title="Toggle Onion Skin"><i class='bx bx-layer'></i> Onion</button>
+          <label class="small-muted" title="Backward frames"><i class='bx bx-chevrons-left' style="vertical-align: middle;"></i></label>
+          <input id="tlOnionBack" class="input" type="number" value="2" min="0" max="10" style="width:50px" />
+          <label class="small-muted" title="Forward frames"><i class='bx bx-chevrons-right' style="vertical-align: middle;"></i></label>
+          <input id="tlOnionFwd" class="input" type="number" value="2" min="0" max="10" style="width:50px" />
+
+          <!-- Divider -->
+          <span style="width:1px;height:18px;background:rgba(255,255,255,0.08);display:inline-block;margin:0 4px"></span>
+
+          <!-- Guides settings -->
+          <button id="tlToggleGuides" class="btn small-edit" title="Toggle Guides"><i class='bx bx-grid-alt'></i> Guides</button>
+          <button id="tlToggleRulers" class="btn small-edit" title="Toggle Rulers"><i class='bx bx-ruler'></i> Rulers</button>
+          <label class="small-muted" style="margin-left:6px">Aspect</label>
+          <select id="tlGuideAspect" class="input" style="width:120px;">
+            <option value="1920x1080">16:9 (1920×1080)</option>
+            <option value="1280x720">16:9 (1280×720)</option>
+            <option value="1024x768">4:3 (1024×768)</option>
+          </select>
+          <label class="small-muted">Title</label>
+          <input id="tlTitleSafePct" class="input" type="number" min="50" max="100" value="90" style="width:64px" />%
+          <label class="small-muted">Action</label>
+          <input id="tlActionSafePct" class="input" type="number" min="50" max="100" value="95" style="width:64px" />%
         </div>
         <div class="tl-right">
           <span id="tlScaleText" class="small-muted"></span>
@@ -684,8 +714,8 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
             <div class="bx-icon"><i class='bx bx-camera-movie'></i></div>
             <div style="flex:1">
               <div style="display:flex;gap:8px;align-items:center">
-                <button id="toggleGuides" class="btn small-edit">Guides</button>
-                <button id="toggleRulers" class="btn small-edit">Rulers</button>
+                <button id="toggleGuides" class="btn small-edit"><i class='bx bx-grid-alt'></i> Guides</button>
+                <button id="toggleRulers" class="btn small-edit"><i class='bx bx-ruler'></i> Rulers</button>
 
                 <label class="small-muted" style="margin-left:6px">Aspect</label>
                 <select id="guideAspect" class="input" style="width:120px;">
@@ -708,12 +738,16 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
           </div>
         </div>
       </div>
-      <div class="canvas-area" style="position:relative; display:inline-block;">
-        <canvas id="drawCanvas" width="1024" height="576" style="background:#fff; border-radius:6px;"></canvas>
-        <canvas id="onionCanvas" width="1024" height="576" style="position:absolute; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
+      <div class="canvas-area" style="position:relative; display:inline-block; margin-left:22px; margin-top:22px;">
+        <canvas id="drawCanvas" width="1024" height="576" style="position:relative; z-index:1; background:transparent; border-radius:6px;"></canvas>
+        <canvas id="onionCanvas" width="1024" height="576" style="position:absolute; z-index:2; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
         
-        <canvas id="guideCanvas" width="1024" height="576" style="position:absolute; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
-        <canvas id="insertCanvas" width="1024" height="576" style="position:absolute; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
+        <canvas id="guideCanvas" width="1024" height="576" style="position:absolute; z-index:3; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
+        <canvas id="insertCanvas" width="1024" height="576" style="position:absolute; z-index:4; left:0; top:0; background:transparent; pointer-events:none;"></canvas>
+        
+        <!-- External rulers outside the white stage -->
+        <canvas id="rulerTop" width="1024" height="22" style="position:absolute; left:0; top:-22px; pointer-events:none;"></canvas>
+        <canvas id="rulerLeft" width="22" height="576" style="position:absolute; left:-22px; top:0; pointer-events:none;"></canvas>
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;padding:8px">
@@ -747,14 +781,17 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
         <div>Copy selected frame(s)</div><div><code>Ctrl</code> + <code>C</code></div>
         <div>Cut selected frame(s)</div><div><code>Ctrl</code> + <code>X</code></div>
         <div>Paste frame(s)</div><div><code>Ctrl</code> + <code>V</code></div>
+        <div>Delete selected frame(s)</div><div><code>Delete</code></div>
+        <div>Next/Prev frame</div><div><code>→</code> / <code>←</code></div>
         <div>Play/Pause (when not typing)</div><div><code>Enter</code></div>
+        <div>New frame</div><div><code>Shift</code> + <code>D</code></div>
       </div>
       <div class="small-muted" style="margin:12px 0 4px; font-weight:700; color:#e6eef8;">Draw/Edit Modal</div>
       <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
         <div>Undo drawing</div><div><code>Ctrl</code> + <code>Z</code></div>
         <div>Redo drawing</div><div><code>Ctrl</code> + <code>Shift</code> + <code>Z</code></div>
         <div>Redo drawing (alt)</div><div><code>Ctrl</code> + <code>Y</code></div>
-        <div>Confirm</div><div><code>Enter</code></div>
+        <div>Confirm</div><div><code>Enter</code> / <code>Tab</code></div>
         <div>Cancel</div><div><code>Esc</code></div>
       </div>
       <div class="small-muted" style="margin:12px 0 4px; font-weight:700; color:#e6eef8;">Timeline</div>
@@ -1124,16 +1161,30 @@ function drawBrushStroke(p1, p2, pressure) {
 }
 
 // New eraser function for bitmap-based erasing
+function eraseDot(p) {
+  dctx.save();
+  dctx.globalCompositeOperation = 'destination-out';
+  const r = Math.max(0.5, (size || 1) / 2);
+  dctx.beginPath();
+  dctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  dctx.fill();
+  dctx.restore();
+}
+
 function drawEraserStroke(p1, p2) {
   dctx.save();
   dctx.globalCompositeOperation = 'destination-out';
-  dctx.lineWidth = size;
-  dctx.lineCap = 'round';
-  dctx.lineJoin = 'round';
+  const r = Math.max(0.5, (size || 1) / 2);
+  const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  const steps = Math.max(1, Math.ceil(dist / 0.75));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = p1.x + (p2.x - p1.x) * t;
+    const y = p1.y + (p2.y - p1.y) * t;
   dctx.beginPath();
-  dctx.moveTo(p1.x, p1.y);
-  dctx.lineTo(p2.x, p2.y);
-  dctx.stroke();
+    dctx.arc(x, y, r, 0, Math.PI * 2);
+    dctx.fill();
+  }
   dctx.restore();
 }
 
@@ -1161,13 +1212,30 @@ const titleInp = document.getElementById('titleSafePct');
 const actionInp = document.getElementById('actionSafePct');
 
 function applyGuideUI() {
-  if (!tgl || !tr || !aspect || !titleInp || !actionInp) return;
-  tgl.style.borderColor = guidesState.enabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
-  tr.style.borderColor = guidesState.rulers ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
-  // set aspect select to current artW/artH
-  aspect.value = `${guidesState.artW}x${guidesState.artH}`;
-  titleInp.value = Math.round(guidesState.titleSafePct);
-  actionInp.value = Math.round(guidesState.actionSafePct);
+  if (!tgl || !tr || !aspect || !titleInp || !actionInp) {
+    // continue to sync TL controls even if modal controls not present
+  }
+  // Modal controls (inside draw dialog)
+  if (tgl) tgl.style.borderColor = guidesState.enabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+  if (tr) tr.style.borderColor = guidesState.rulers ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+  if (aspect) aspect.value = `${guidesState.artW}x${guidesState.artH}`;
+  if (titleInp) titleInp.value = Math.round(guidesState.titleSafePct);
+  if (actionInp) actionInp.value = Math.round(guidesState.actionSafePct);
+
+  // TL controls (outside, in timeline toolbar)
+  const tlTgl = document.getElementById('tlToggleGuides');
+  const tlTr = document.getElementById('tlToggleRulers');
+  const tlAspect = document.getElementById('tlGuideAspect');
+  const tlTitle = document.getElementById('tlTitleSafePct');
+  const tlAction = document.getElementById('tlActionSafePct');
+  if (tlTgl) tlTgl.style.borderColor = guidesState.enabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+  if (tlTr) tlTr.style.borderColor = guidesState.rulers ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+  if (tlAspect) tlAspect.value = `${guidesState.artW}x${guidesState.artH}`;
+  if (tlTitle) tlTitle.value = Math.round(guidesState.titleSafePct);
+  if (tlAction) tlAction.value = Math.round(guidesState.actionSafePct);
+
+  // update outside rulers if modal is open
+  try { if (drawDialog.classList.contains('open')) drawOutsideRulers(); } catch(_){ }
 }
 
 // toggle panel visibility
@@ -1200,15 +1268,15 @@ document.addEventListener('click', (e) => {
 });
 
 // wire controls inside panel to guidesState and re-render
-if (tgl) tgl.addEventListener('click', ()=>{ guidesState.enabled = !guidesState.enabled; applyGuideUI(); try { redrawPaths(); drawPreview(); } catch(e){} });
-if (tr) tr.addEventListener('click', ()=>{ guidesState.rulers = !guidesState.rulers; applyGuideUI(); try { redrawPaths(); drawPreview(); } catch(e){} });
+if (tgl) tgl.addEventListener('click', ()=>{ guidesState.enabled = !guidesState.enabled; applyGuideUI(); try { redrawPaths(); drawPreview(); drawOutsideRulers(); } catch(e){} });
+if (tr) tr.addEventListener('click', ()=>{ guidesState.rulers = !guidesState.rulers; applyGuideUI(); try { redrawPaths(); drawPreview(); drawOutsideRulers(); } catch(e){} });
 if (aspect) aspect.addEventListener('change', ()=>{
   const v = (aspect.value || '1920x1080').split('x');
   guidesState.artW = Number(v[0]) || 1920; guidesState.artH = Number(v[1]) || 1080;
-  try { redrawPaths(); drawPreview(); } catch(e) {}
+  try { applyGuideUI(); redrawPaths(); drawPreview(); drawOutsideRulers(); } catch(e) {}
 });
-if (titleInp) titleInp.addEventListener('change', ()=>{ guidesState.titleSafePct = Math.max(50, Math.min(100, Number(titleInp.value)||90)); try { redrawPaths(); drawPreview(); } catch(e){} });
-if (actionInp) actionInp.addEventListener('change', ()=>{ guidesState.actionSafePct = Math.max(50, Math.min(100, Number(actionInp.value)||95)); try { redrawPaths(); drawPreview(); } catch(e){} });
+if (titleInp) titleInp.addEventListener('change', ()=>{ guidesState.titleSafePct = Math.max(50, Math.min(100, Number(titleInp.value)||90)); try { applyGuideUI(); redrawPaths(); drawPreview(); drawOutsideRulers(); } catch(e){} });
+if (actionInp) actionInp.addEventListener('change', ()=>{ guidesState.actionSafePct = Math.max(50, Math.min(100, Number(actionInp.value)||95)); try { applyGuideUI(); redrawPaths(); drawPreview(); drawOutsideRulers(); } catch(e){} });
 
 // ensure UI initial state
 applyGuideUI();
@@ -1218,47 +1286,231 @@ applyGuideUI();
 
 // drawGuides: draws artboard box, safe areas and rulers on given ctx & canvas size
 function drawGuides(ctx, canvasW, canvasH) {
-  if(!guidesState.enabled) return;
-
+  // compute artboard fit
   const artW = guidesState.artW, artH = guidesState.artH;
-  // compute scale to fit artboard inside canvas (cover both drawCanvas & preview)
   const scale = Math.min(canvasW / artW, canvasH / artH);
   const aw = Math.round(artW * scale), ah = Math.round(artH * scale);
   const ox = Math.round((canvasW - aw) / 2), oy = Math.round((canvasH - ah) / 2);
 
   ctx.save();
 
-  // Hapus outer artboard border dan center lines - tidak diperlukan lagi
-  
-  // safe areas
-  const titlePadX = aw * ((100 - guidesState.titleSafePct) / 200); // symmetric inset
-  const titlePadY = ah * ((100 - guidesState.titleSafePct) / 200);
-  const actionPadX = aw * ((100 - guidesState.actionSafePct) / 200);
-  const actionPadY = ah * ((100 - guidesState.actionSafePct) / 200);
+  // Safe areas (independent from rulers)
+  if (guidesState.enabled) {
+    const titlePadX = aw * ((100 - guidesState.titleSafePct) / 200);
+    const titlePadY = ah * ((100 - guidesState.titleSafePct) / 200);
+    const actionPadX = aw * ((100 - guidesState.actionSafePct) / 200);
+    const actionPadY = ah * ((100 - guidesState.actionSafePct) / 200);
 
-  // action safe (outer)
-  ctx.strokeStyle = 'rgba(90,200,180,0.95)'; // teal
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6,4]);
-  ctx.strokeRect(ox + actionPadX + 0.5, oy + actionPadY + 0.5, aw - actionPadX*2 -1, ah - actionPadY*2 -1);
+    // action safe (outer)
+    ctx.strokeStyle = 'rgba(90,200,180,0.95)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6,4]);
+    ctx.strokeRect(ox + actionPadX + 0.5, oy + actionPadY + 0.5, aw - actionPadX*2 -1, ah - actionPadY*2 -1);
 
-  // title safe (inner)
-  ctx.strokeStyle = 'rgba(240,200,80,0.95)'; // yellow
-  ctx.lineWidth = 2;
-  ctx.setLineDash([4,2]);
-  ctx.strokeRect(ox + titlePadX + 0.5, oy + titlePadY + 0.5, aw - titlePadX*2 -1, ah - titlePadY*2 -1);
+    // title safe (inner)
+    ctx.strokeStyle = 'rgba(240,200,80,0.95)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4,2]);
+    ctx.strokeRect(ox + titlePadX + 0.5, oy + titlePadY + 0.5, aw - titlePadX*2 -1, ah - titlePadY*2 -1);
 
-  // small labels for safe boxes
-  ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(240,200,80,0.95)';
-  ctx.font = '12px "Segoe UI", sans-serif';
-  ctx.fillText('Title Safe ' + guidesState.titleSafePct + '%', ox + titlePadX + 8, oy + titlePadY + 14);
-  ctx.fillStyle = 'rgba(90,200,180,0.95)';
-  ctx.fillText('Action Safe ' + guidesState.actionSafePct + '%', ox + actionPadX + 8, oy + actionPadY + 14);
+    // labels
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(240,200,80,0.95)';
+    ctx.font = '12px "Segoe UI", sans-serif';
+    ctx.fillText('Title Safe ' + guidesState.titleSafePct + '%', ox + titlePadX + 8, oy + titlePadY + 14);
+    ctx.fillStyle = 'rgba(90,200,180,0.95)';
+    ctx.fillText('Action Safe ' + guidesState.actionSafePct + '%', ox + actionPadX + 8, oy + actionPadY + 14);
+  }
 
-  // Hapus seluruh bagian rulers - tidak diperlukan lagi
+  // Rulers are handled externally for both modal and preview now
 
   ctx.restore();
+}
+
+// Draw external rulers for draw modal (outside stage)
+function drawOutsideRulers() {
+  const rt = document.getElementById('rulerTop');
+  const rl = document.getElementById('rulerLeft');
+  if (!rt || !rl) return;
+
+  const show = !!guidesState.rulers;
+  rt.style.display = show ? 'block' : 'none';
+  rl.style.display = show ? 'block' : 'none';
+  if (!show) return;
+
+  // sync sizes
+  rt.width = drawCanvas.width; rt.height = 22;
+  rl.width = 22; rl.height = drawCanvas.height;
+
+  const rtx = rt.getContext('2d');
+  const rlx = rl.getContext('2d');
+  rtx.clearRect(0,0,rt.width,rt.height);
+  rlx.clearRect(0,0,rl.width,rl.height);
+
+  // backgrounds
+  rtx.fillStyle = 'rgba(0,0,0,0.4)';
+  rtx.fillRect(0,0,rt.width,rt.height);
+  rlx.fillStyle = 'rgba(0,0,0,0.4)';
+  rlx.fillRect(0,0,rl.width,rl.height);
+
+  // artboard mapping
+  const artW = guidesState.artW, artH = guidesState.artH;
+  const scale = Math.min(drawCanvas.width / artW, drawCanvas.height / artH);
+  const ppu = scale;
+
+  // choose minor unit
+  const candidates = [1,2,5,10,20,50,100,200,500,1000,2000];
+  const targetPx = 14;
+  let minorUnit = 10;
+  let bestDiff = Infinity;
+  for (const u of candidates) {
+    const d = Math.abs(ppu * u - targetPx);
+    if (ppu * u >= 8 && d < bestDiff) { bestDiff = d; minorUnit = u; }
+  }
+  const majorEvery = 10;
+
+  // styles
+  rtx.strokeStyle = 'rgba(255,255,255,0.75)';
+  rtx.fillStyle = 'rgba(255,255,255,0.75)';
+  rtx.lineWidth = 1;
+  rtx.font = '10px "Segoe UI", sans-serif';
+
+  rlx.strokeStyle = 'rgba(255,255,255,0.75)';
+  rlx.fillStyle = 'rgba(255,255,255,0.75)';
+  rlx.lineWidth = 1;
+  rlx.font = '10px "Segoe UI", sans-serif';
+
+  // top ruler ticks across stage width mapped to art units
+  for (let u = 0; u <= artW; u += minorUnit) {
+    const x = Math.round(u * ppu) + 0.5;
+    if (x > rt.width + 0.5) break;
+    const isMajor = (Math.round(u) % (minorUnit * majorEvery) === 0);
+    const len = isMajor ? 12 : 6;
+    rtx.beginPath();
+    rtx.moveTo(x, rt.height - len + 0.5);
+    rtx.lineTo(x, rt.height + 0.5);
+    rtx.stroke();
+    if (isMajor) rtx.fillText(String(Math.round(u)), x + 2, 10);
+  }
+
+  // left ruler ticks across stage height mapped to art units
+  for (let v = 0; v <= artH; v += minorUnit) {
+    const y = Math.round(v * ppu) + 0.5;
+    if (y > rl.height + 0.5) break;
+    const isMajor = (Math.round(v) % (minorUnit * majorEvery) === 0);
+    const len = isMajor ? 12 : 6;
+    rlx.beginPath();
+    rlx.moveTo(rl.width - len + 0.5, y);
+    rlx.lineTo(rl.width + 0.5, y);
+    rlx.stroke();
+    if (isMajor) {
+      rlx.save();
+      rlx.translate(4, y - 2);
+      rlx.rotate(-Math.PI/2);
+      rlx.fillText(String(Math.round(v)), 0, 0);
+      rlx.restore();
+    }
+  }
+}
+
+// Draw external rulers for preview (outside stage)
+function drawPreviewOutsideRulers() {
+  const previewEl = document.getElementById('preview');
+  const rt = document.getElementById('previewRulerTop');
+  const rl = document.getElementById('previewRulerLeft');
+  const corner = document.getElementById('previewRulerCorner');
+  if (!previewEl || !rt || !rl || !corner) return;
+
+  const show = !!guidesState.rulers;
+  rt.style.display = show ? 'block' : 'none';
+  rl.style.display = show ? 'block' : 'none';
+  corner.style.display = show ? 'block' : 'none';
+  if (!show) return;
+
+  // compute display size and set hi-dpi canvas sizes
+  const rect = previewEl.getBoundingClientRect();
+  const cssW = Math.max(0, Math.floor(rect.width));
+  const cssH = Math.max(0, Math.floor(rect.height));
+  const dpr = window.devicePixelRatio || 1;
+
+  // set CSS size (already via style width/height), set pixel size and scale
+  rt.width = Math.max(1, Math.floor(cssW * dpr));
+  rt.height = Math.max(1, Math.floor(22 * dpr));
+  rl.width = Math.max(1, Math.floor(22 * dpr));
+  rl.height = Math.max(1, Math.floor(cssH * dpr));
+
+  const rtx = rt.getContext('2d');
+  const rlx = rl.getContext('2d');
+  rtx.setTransform(dpr,0,0,dpr,0,0);
+  rlx.setTransform(dpr,0,0,dpr,0,0);
+  rtx.clearRect(0,0,cssW,22);
+  rlx.clearRect(0,0,22,cssH);
+
+  // backgrounds
+  rtx.fillStyle = 'rgba(0,0,0,0.4)';
+  rtx.fillRect(0,0,cssW,22);
+  rlx.fillStyle = 'rgba(0,0,0,0.4)';
+  rlx.fillRect(0,0,22,cssH);
+
+  // artboard mapping in CSS pixels
+  const artW = guidesState.artW, artH = guidesState.artH;
+  const ppu = Math.min(cssW / artW, cssH / artH);
+  const aw = Math.round(artW * ppu), ah = Math.round(artH * ppu);
+  const ox = Math.round((cssW - aw) / 2), oy = Math.round((cssH - ah) / 2);
+
+  // choose minor unit
+  const candidates = [1,2,5,10,20,50,100,200,500,1000,2000];
+  const targetPx = 14;
+  let minorUnit = 10;
+  let bestDiff = Infinity;
+  for (const u of candidates) {
+    const d = Math.abs(ppu * u - targetPx);
+    if (ppu * u >= 8 && d < bestDiff) { bestDiff = d; minorUnit = u; }
+  }
+  const majorEvery = 10;
+
+  // styles
+  rtx.strokeStyle = 'rgba(255,255,255,0.75)';
+  rtx.fillStyle = 'rgba(255,255,255,0.75)';
+  rtx.lineWidth = 1;
+  rtx.font = '10px "Segoe UI", sans-serif';
+
+  rlx.strokeStyle = 'rgba(255,255,255,0.75)';
+  rlx.fillStyle = 'rgba(255,255,255,0.75)';
+  rlx.lineWidth = 1;
+  rlx.font = '10px "Segoe UI", sans-serif';
+
+  // ticks top
+  for (let u = 0; u <= artW; u += minorUnit) {
+    const x = Math.round(ox + u * ppu) + 0.5;
+    if (x > cssW + 0.5) break;
+    const isMajor = (Math.round(u) % (minorUnit * majorEvery) === 0);
+    const len = isMajor ? 12 : 6;
+    rtx.beginPath();
+    rtx.moveTo(x, 22 - len + 0.5);
+    rtx.lineTo(x, 22 + 0.5);
+    rtx.stroke();
+    if (isMajor) rtx.fillText(String(Math.round(u)), x + 2, 10);
+  }
+
+  // ticks left
+  for (let v = 0; v <= artH; v += minorUnit) {
+    const y = Math.round(oy + v * ppu) + 0.5;
+    if (y > cssH + 0.5) break;
+    const isMajor = (Math.round(v) % (minorUnit * majorEvery) === 0);
+    const len = isMajor ? 12 : 6;
+    rlx.beginPath();
+    rlx.moveTo(22 - len + 0.5, y);
+    rlx.lineTo(22 + 0.5, y);
+    rlx.stroke();
+    if (isMajor) {
+      rlx.save();
+      rlx.translate(4, y - 2);
+      rlx.rotate(-Math.PI/2);
+      rlx.fillText(String(Math.round(v)), 0, 0);
+      rlx.restore();
+    }
+  }
 }
 
 // ========== Onion Skin Feature ==========
@@ -1276,24 +1528,69 @@ function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
   const backInput = document.getElementById('onionBackInput');
   const fwdInput = document.getElementById('onionFwdInput');
 
-  if(!toggle || !backInput || !fwdInput) return; // safe exit if UI not present
-
-  function updateUI(){
-    toggle.style.borderColor = onionEnabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
-    backInput.value = String(onionBackCount);
-    fwdInput.value = String(onionFwdCount);
-    // redraw edit canvas if open
-    if(drawDialog.classList.contains('open')) redrawPaths();
+  if(!toggle || !backInput || !fwdInput) {
+    // still allow TL controls to manage state
   }
 
-  toggle.addEventListener('click', ()=>{ 
+  function updateUI(){
+    if (toggle) toggle.style.borderColor = onionEnabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+    if (backInput) backInput.value = String(onionBackCount);
+    if (fwdInput) fwdInput.value = String(onionFwdCount);
+    // also sync TL controls
+    try { syncOnionUIElements(); } catch(_){ }
+    // redraw edit canvas if open; otherwise refresh preview
+    if(drawDialog.classList.contains('open')) { try { redrawPaths(); } catch(_){} }
+    else { try { drawPreview(); } catch(_){} }
+  }
+
+  if (toggle) toggle.addEventListener('click', ()=>{ 
     onionEnabled = !onionEnabled;
     localStorage.setItem('ladaboard.onionEnabled', onionEnabled); // Save state
     updateUI();
   });
-  backInput.addEventListener('change', ()=>{ onionBackCount = clamp(Number(backInput.value), 0, 10); updateUI(); });
-  fwdInput.addEventListener('change', ()=>{ onionFwdCount = clamp(Number(fwdInput.value), 0, 10); updateUI(); });
+  if (backInput) backInput.addEventListener('change', ()=>{ onionBackCount = clamp(Number(backInput.value), 0, 10); updateUI(); });
+  if (fwdInput) fwdInput.addEventListener('change', ()=>{ onionFwdCount = clamp(Number(fwdInput.value), 0, 10); updateUI(); });
   updateUI();
+})();
+
+// NEW: External Onion UI (Timeline toolbar) + sync helper
+function syncOnionUIElements(){
+  const tlToggle = document.getElementById('tlToggleOnion');
+  const tlBack = document.getElementById('tlOnionBack');
+  const tlFwd = document.getElementById('tlOnionFwd');
+  if (tlToggle) tlToggle.style.borderColor = onionEnabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+  if (tlBack) tlBack.value = String(onionBackCount);
+  if (tlFwd) tlFwd.value = String(onionFwdCount);
+}
+
+(function initTimelineOnion(){
+  const tlToggle = document.getElementById('tlToggleOnion');
+  const tlBack = document.getElementById('tlOnionBack');
+  const tlFwd = document.getElementById('tlOnionFwd');
+  if (tlToggle) tlToggle.addEventListener('click', ()=>{
+    onionEnabled = !onionEnabled;
+    localStorage.setItem('ladaboard.onionEnabled', onionEnabled);
+    syncOnionUIElements();
+    // also reflect to modal button if present
+    const toggle = document.getElementById('toggleOnion');
+    if (toggle) toggle.style.borderColor = onionEnabled ? 'var(--accent)' : 'rgba(255,255,255,0.06)';
+    if(drawDialog.classList.contains('open')) { try { redrawPaths(); } catch(_){} } else { try { drawPreview(); } catch(_){} }
+  });
+  if (tlBack) tlBack.addEventListener('change', ()=>{
+    onionBackCount = clamp(Number(tlBack.value), 0, 10);
+    syncOnionUIElements();
+    const backInput = document.getElementById('onionBackInput');
+    if (backInput) backInput.value = String(onionBackCount);
+    if(drawDialog.classList.contains('open')) { try { redrawPaths(); } catch(_){} } else { try { drawPreview(); } catch(_){} }
+  });
+  if (tlFwd) tlFwd.addEventListener('change', ()=>{
+    onionFwdCount = clamp(Number(tlFwd.value), 0, 10);
+    syncOnionUIElements();
+    const fwdInput = document.getElementById('onionFwdInput');
+    if (fwdInput) fwdInput.value = String(onionFwdCount);
+    if(drawDialog.classList.contains('open')) { try { redrawPaths(); } catch(_){} } else { try { drawPreview(); } catch(_){} }
+  });
+  syncOnionUIElements();
 })();
 
 // draw single thumbnail image to ctx using existing drawImageCover util
@@ -1301,13 +1598,13 @@ function drawThumbInto(ctx, img, alpha, tint) {
   if(!img) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-  // draw image cover to full canvas
-  try { drawImageCover(ctx, img, drawCanvas.width, drawCanvas.height); } catch(e){}
+  const cw = ctx.canvas && ctx.canvas.width ? ctx.canvas.width : drawCanvas.width;
+  const ch = ctx.canvas && ctx.canvas.height ? ctx.canvas.height : drawCanvas.height;
+  try { drawImageCover(ctx, img, cw, ch); } catch(e){}
   if(tint){
-    // simple tint overlay
     ctx.fillStyle = tint;
     ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
+    ctx.fillRect(0,0,cw,ch);
   }
   ctx.restore();
 }
@@ -1319,66 +1616,69 @@ function ensureFrameImage(frame){
   if(!frame.thumb) return null;
   const im = new Image();
   im.src = frame.thumb;
-  // when loaded, request a redraw of the draw canvas if it's open
-  im.onload = ()=>{ if(drawDialog.classList.contains('open')) redrawPaths(); };
+  // when loaded, request a redraw of the draw canvas if it's open and preview otherwise
+  im.onload = ()=>{ 
+    if(drawDialog.classList.contains('open')) { 
+      try { 
+        redrawPaths(); 
+        const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+        renderOnionSkinsOverlay(idx);
+      } catch(_){} 
+    }
+    else { try { drawPreview(); } catch(_){} }
+  };
   frame._img = im;
   return im;
 }
 
-// main onion rendering — draws backward (older) and forward frames
-// PERHATIAN: Fungsi ini hanya boleh dipanggil dalam mode edit/draw
-// Jangan panggil di drawPreview() atau confirmDraw() untuk menghindari onion skin tersimpan ke bitmap final
-function renderOnionSkins(ctx, refIndex){
+// main onion rendering — draws backward (older) and forward frames to any ctx
+function renderOnionSkinsToContext(ctx, refIndex){
   if(!onionEnabled) return;
   if(typeof refIndex !== 'number' || refIndex < 0) return;
 
-  // backward frames: tint reddish/orange
+  // backward frames: tinted warm lines
   for(let i = 1; i <= onionBackCount; i++){
     const idx = refIndex - i;
     if(idx < 0 || !state.frames[idx]) continue;
     const f = state.frames[idx];
-    const img = ensureFrameImage(f);
-    const alpha = 0.45 * (1 - (i-1) / Math.max(1, onionBackCount)); // nearer = stronger
-    drawThumbInto(ctx, img, alpha, 'rgba(255,120,90,0.18)'); // warm tint
+    // prefer decoded bitmap, fallback to HTMLImage
+    const srcImg = f._bmp || ensureFrameImage(f);
+    if (!f._bmp) ensureFrameBitmap(f, refIndex); // kick async decode
+    const alpha = 0.45 * (1 - (i-1) / Math.max(1, onionBackCount));
+    const ok = drawTintedLinesFromImage(ctx, srcImg, 'rgba(255,120,90,1)', alpha);
+    if (!ok) drawThumbInto(ctx, srcImg, alpha, 'rgba(255,120,90,0.18)');
   }
 
-  // forward frames: tint green/cyan
+  // forward frames: tinted cool lines
   for(let i = 1; i <= onionFwdCount; i++){
     const idx = refIndex + i;
     if(idx >= state.frames.length || !state.frames[idx]) continue;
     const f = state.frames[idx];
-    const img = ensureFrameImage(f);
+    const srcImg = f._bmp || ensureFrameImage(f);
+    if (!f._bmp) ensureFrameBitmap(f, refIndex);
     const alpha = 0.45 * (1 - (i-1) / Math.max(1, onionFwdCount));
-    drawThumbInto(ctx, img, alpha, 'rgba(110,230,200,0.16)'); // cool tint
+    const ok = drawTintedLinesFromImage(ctx, srcImg, 'rgba(110,230,200,1)', alpha);
+    if (!ok) drawThumbInto(ctx, srcImg, alpha, 'rgba(110,230,200,0.16)');
   }
 }
 
 // Fungsi baru untuk render onion skin ke overlay canvas terpisah
-// Fungsi ini memastikan onion skin tidak tercampur dengan gambar utama
+// Fungsi ini memastikan onion skin tidak tercampur dengan gambar utama dan tidak menimpa garis aktif
 function renderOnionSkinsOverlay(refIndex) {
   octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
   if (!onionEnabled) return;
   if (typeof refIndex !== 'number' || refIndex < 0) return;
-
-  // backward frames: tint reddish/orange
-  for(let i = 1; i <= onionBackCount; i++){
-    const idx = refIndex - i;
-    if(idx < 0 || !state.frames[idx]) continue;
-    const f = state.frames[idx];
-    const img = ensureFrameImage(f);
-    const alpha = 0.45 * (1 - (i-1) / Math.max(1, onionBackCount)); // nearer = stronger
-    drawThumbInto(octx, img, alpha, 'rgba(255,120,90,0.18)'); // warm tint
-  }
-
-  // forward frames: tint green/cyan
-  for(let i = 1; i <= onionFwdCount; i++){
-    const idx = refIndex + i;
-    if(idx >= state.frames.length || !state.frames[idx]) continue;
-    const f = state.frames[idx];
-    const img = ensureFrameImage(f);
-    const alpha = 0.45 * (1 - (i-1) / Math.max(1, onionFwdCount));
-    drawThumbInto(octx, img, alpha, 'rgba(110,230,200,0.16)'); // cool tint
-  }
+  // Prefetch neighbor frames to avoid missing skins while decoding (prioritize immediate neighbors)
+  try { primeOnionNeighbors(refIndex); } catch(_){}
+  renderOnionSkinsToContext(octx, refIndex);
+  // punch out current strokes so active lines stay crisp
+  try {
+    const mask = createStrokeMaskCanvasFromContext(dctx, drawCanvas.width, drawCanvas.height);
+    octx.save();
+    octx.globalCompositeOperation = 'destination-out';
+    octx.drawImage(mask, 0, 0);
+    octx.restore();
+  } catch(_){ }
 }
 let tool='pen', color='#000', size=6, drawing=false;
 let baseImage = null; // Image object for background when editing an existing frame
@@ -1975,7 +2275,7 @@ function selectFrame(i, e = {}) {
     // Keep timeline selection in sync without moving playhead
     try {
       if (typeof tl !== 'undefined') {
-        tl.selection = new Set([state.selected]);
+        tl.selection = new Set(Array.from(selectedFrames));
         renderTimeline();
       }
     } catch(_) { }
@@ -2069,34 +2369,52 @@ function drawOverlayCanvas(title, elapsedMs) {
 
 // main preview draw
 function drawPreview(){ 
-  pctx.clearRect(0,0,preview.width,preview.height); 
   const sel = state.selected; 
   if(sel<0||!state.frames[sel]){ 
+    // nothing selected → draw empty bg + guides/overlays
+    pctx.clearRect(0,0,preview.width,preview.height);
     pctx.fillStyle='#0b0b0b'; 
     pctx.fillRect(0,0,preview.width,preview.height); 
+    try { drawPreviewOutsideRulers(); } catch(_){ }
+    try {
+      const temp = document.createElement('canvas'); temp.width = preview.width; temp.height = preview.height; const tx = temp.getContext('2d');
+      renderOnionSkinsToContext(tx, 0);
+      pctx.drawImage(temp,0,0);
+    } catch(_){ }
+    drawGuides(pctx, preview.width, preview.height);
     drawOverlayCanvas('No cut selected',0); 
     return; 
   }
+
   const f = state.frames[sel]; 
-  if(f.thumb){ 
-    const img = new Image(); 
-    img.onload = ()=>{ 
-      drawImageCover(pctx,img,preview.width,preview.height); 
-      // Tambahkan guides untuk mode Upload juga
-      drawGuides(pctx, preview.width, preview.height);
-      drawOverlayCanvas('Cut no. ' + (sel+1), 0); 
-    }; 
-    img.onerror = ()=>{ 
-      pctx.fillStyle='#111'; 
-      pctx.fillRect(0,0,preview.width,preview.height); 
-      drawOverlayCanvas('Cut no. ' + (sel+1), 0); 
-    }; 
-    img.src = f.thumb; 
+  primeCacheAround(sel);
+  const img = f.thumb ? ensureFrameImage(f) : null;
+  const ready = !!(img && img.complete && img.naturalWidth > 0);
+
+  // choose base image to draw to avoid flicker while new image is decoding
+  const baseToDraw = ready ? img : (lastPreviewImage || null);
+
+  pctx.clearRect(0,0,preview.width,preview.height);
+  if (baseToDraw) {
+    try { drawImageCover(pctx, baseToDraw, preview.width, preview.height); } catch(_){ }
   } else { 
     pctx.fillStyle='#111'; 
     pctx.fillRect(0,0,preview.width,preview.height); 
+  }
+
+  // Render onion skins above base
+    try {
+      const temp = document.createElement('canvas'); temp.width = preview.width; temp.height = preview.height; const tx = temp.getContext('2d');
+      renderOnionSkinsToContext(tx, sel);
+      pctx.drawImage(temp,0,0);
+    } catch(_){ }
+
+  // Guides + rulers + overlay
+    drawGuides(pctx, preview.width, preview.height);
+  try { drawPreviewOutsideRulers(); } catch(_){ }
     drawOverlayCanvas('Cut no. ' + (sel+1), 0); 
-  } 
+
+  if (ready) { lastPreviewImage = img; lastPreviewIndex = sel; }
 }
 
 // drawing modal (improved)
@@ -2124,13 +2442,40 @@ function openDraw(initial = null){
   dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   dctx.fillStyle = '#fff';
   dctx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
+  // ensure visual background is white so eraser holes don't look black
+  try { drawCanvas.style.background = '#ffffff'; } catch(_){}
+
+  // Prefetch onion neighbors for the frame being edited (prioritize immediate)
+  try { 
+    const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+    if (idx != null) primeOnionNeighbors(idx);
+  } catch(_){}
+
+  // draw initial onion
+  try { 
+    const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+    renderOnionSkinsOverlay(idx); 
+  } catch(_){ }
+
+  // sync and draw external rulers
+  try { drawOutsideRulers(); } catch(_){ }
 
   function scheduleRedraw() {
     // draw after browser paint; fallback in 40ms for rare races
     requestAnimationFrame(() => {
-      try { redrawPaths(); } catch(e){}
+      try { 
+        redrawPaths(); 
+        const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+        renderOnionSkinsOverlay(idx); 
+        drawOutsideRulers(); 
+      } catch(e){}
       setTimeout(() => {
-        try { redrawPaths(); } catch(e){}
+        try { 
+          redrawPaths(); 
+          const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+          renderOnionSkinsOverlay(idx); 
+          drawOutsideRulers(); 
+        } catch(e){}
       }, 40);
     });
   }
@@ -2169,6 +2514,10 @@ function closeDraw(){
   ictx.clearRect(0, 0, insertCanvas.width, insertCanvas.height);
   insertImage = null;
   applyImageBtn && (applyImageBtn.style.display = 'none');
+  // restore visual background
+  try { drawCanvas.style.background = 'transparent'; } catch(_){}
+  // hide outside rulers
+  try { const rt = document.getElementById('rulerTop'); const rl = document.getElementById('rulerLeft'); if (rt) rt.style.display = 'none'; if (rl) rl.style.display = 'none'; } catch(_){ }
 }
 
 // toolbar events
@@ -2272,15 +2621,11 @@ drawCanvas.addEventListener('pointerdown',async e=>{
       saveCanvasState();
       // For bitmap-based system, we'll use a simple circular eraser at the click point
       // This creates a circular transparent area
-      dctx.save();
-      dctx.globalCompositeOperation = 'destination-out';
-      dctx.beginPath();
-      dctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-      dctx.fill();
-      dctx.restore();
+      eraseDot(p);
       return;
     } else {
-      // Stroke mode - start erasing
+      // Stroke mode - start erasing with an initial dot to avoid missing the first tap
+      eraseDot(p);
       return;
     }
   }
@@ -2437,14 +2782,23 @@ function redrawPaths(){
   }
 
   // 2. Gambar Onion Skin di octx (onionCanvas)
-  const refIndex = (typeof editIndex === 'number' && editIndex !== null) ? editIndex : state.frames.length;
+  let refIndex;
+  if (drawDialog.classList.contains('open') && (editIndex == null || !(typeof editIndex === 'number' && editIndex >= 0))) {
+    // New draw frame: use virtual index after the last frame so immediate previous shows up
+    refIndex = state.frames.length;
+  } else if (typeof editIndex === 'number' && editIndex >= 0) {
+    refIndex = editIndex;
+  } else {
+    refIndex = clampIndex(state.selected);
+  }
+  if (refIndex < 0) refIndex = Math.max(0, state.frames.length - 1);
   if (drawDialog.classList.contains('open')) {
     renderOnionSkinsOverlay(refIndex);
   } else {
     octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
   }
 
-  // 3. Gambar Guides di gctx (guideCanvas) - INI PERUBAHAN UTAMA
+  // 3. Gambar Guides di gctx (guideCanvas)
   gctx.clearRect(0, 0, guideCanvas.width, guideCanvas.height); // Bersihkan kanvas panduan
   drawGuides(gctx, guideCanvas.width, guideCanvas.height);    // Gambar panduan di atasnya
 }
@@ -2495,19 +2849,23 @@ document.getElementById('confirmDraw').addEventListener('click',async ()=>{
   temp.height = drawCanvas.height;
   const tctx = temp.getContext('2d');
 
-  // Base image tanpa onion skin
+  // Fill white background so eraser reveals white instead of black/transparent
+  tctx.fillStyle = '#ffffff';
+  tctx.fillRect(0, 0, temp.width, temp.height);
+
+  // Base image tanpa onion skin (opsional, akan tertutup oleh drawCanvas jika ada)
   if(baseImage){
     drawImageCover(tctx, baseImage, temp.width, temp.height);
   }
   
-  // If there is an active inserted image transformation, render it to the temp canvas without handles
+  // Gambar konten utama dari drawCanvas terlebih dahulu (sudah termasuk background putih dan coretan)
+  tctx.drawImage(drawCanvas,0,0);
+  
+  // Jika ada gambar yang sedang di-insert (belum di-Apply), komposit TERAKHIR supaya tidak ketutup
   if (insertImage) {
     drawTransformedImageOnly(tctx);
   }
   
-  // Tambahkan gambar hasil edit (tanpa onion skin)
-  tctx.drawImage(drawCanvas,0,0);
-
   // Ambil data URL dari temporary canvas (tanpa onion skin)
   const data = temp.toDataURL('image/png');
   
@@ -3314,7 +3672,7 @@ function playbackLoop() {
     if (!playing) return;
 
     const elapsed = pausedTime + (performance.now() - playStartTime);
-    try { setPlayheadFromElapsedMs(elapsed); } catch(_){}
+    try { setPlayheadFromElapsedMs(elapsed); } catch(_){ }
     const frameIdx = findFrameIndex(elapsed);
 
     if (frameIdx === -1) {
@@ -3342,22 +3700,25 @@ function playbackLoop() {
     const f = state.frames[currentFrameIndex];
     if (!f) { stopPlayback(); return; }
 
-    const img = new Image();
-    img.onload = () => {
+    // draw from cache; fall back to lastPreviewImage to avoid blink
+    primeCacheAround(currentFrameIndex);
+    const img = f.thumb ? ensureFrameImage(f) : null;
+    const ready = !!(img && img.complete && img.naturalWidth > 0);
+    const baseToDraw = ready ? img : (lastPreviewImage || null);
+
         pctx.clearRect(0, 0, preview.width, preview.height);
-        try { pctx.drawImage(img, 0, 0, preview.width, preview.height); } catch (e) {}
-        try { drawGuides(pctx, preview.width, preview.height); } catch(e) {}
-        drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
-        rafId = requestAnimationFrame(playbackLoop);
-    };
-    img.onerror = () => {
-        pctx.clearRect(0, 0, preview.width, preview.height);
+    if (baseToDraw) {
+      try { drawImageCover(pctx, baseToDraw, preview.width, preview.height); } catch(e) {}
+    } else {
         pctx.fillStyle = '#111';
         pctx.fillRect(0, 0, preview.width, preview.height);
+    }
+    try { drawGuides(pctx, preview.width, preview.height); } catch(e) {}
         drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
+
+    if (ready) { lastPreviewImage = img; lastPreviewIndex = currentFrameIndex; }
+
         rafId = requestAnimationFrame(playbackLoop);
-    };
-    img.src = f.thumb || blankImageData(preview.width, preview.height);
 }
 
 function startPlayback() {
@@ -3469,6 +3830,12 @@ window.addEventListener('keydown', e => {
       document.getElementById('confirmDraw').click();
       return;
     }
+    // Tab to confirm as well while in draw/edit modal
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      document.getElementById('confirmDraw').click();
+      return;
+    }
     // Escape to cancel
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -3500,6 +3867,14 @@ window.addEventListener('keydown', e => {
     }
   }
 
+  // Shift+D to create new frame (mirrors New Frame button behavior)
+  if (!isInputting && !drawDialog.classList.contains('open') && e.shiftKey && e.key.toLowerCase() === 'd') {
+    e.preventDefault();
+    const addBtn = document.getElementById('addFrame');
+    if (addBtn) addBtn.click();
+    return;
+  }
+
   // Handle Enter key separately for playback vs. newline/confirm
   if (e.key === 'Enter') {
     if (isInputting) {
@@ -3511,6 +3886,31 @@ window.addEventListener('keydown', e => {
     }
     e.preventDefault();
     togglePlayback();
+  }
+
+  // Delete selected frames (when not typing and not in draw modal)
+  if (!isInputting && !drawDialog.classList.contains('open') && e.key === 'Delete') {
+    if (selectedFrames.size > 0) {
+      e.preventDefault();
+      deleteSelectedFrames();
+      return;
+    }
+  }
+
+  // Arrow Left/Right to navigate frames (when not typing and not in draw modal)
+  if (!isInputting && !drawDialog.classList.contains('open')) {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prevIndex = clampIndex(state.selected - 1);
+      selectFrame(prevIndex, e);
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextIndex = clampIndex(state.selected + 1);
+      selectFrame(nextIndex, e);
+      return;
+    }
   }
 });
 
@@ -4206,6 +4606,9 @@ function wireTimelineEvents(){
     // if grabbing near playhead anywhere -> scrub
     const phx = tl.gutterW + tl.playhead * tl.pxPerFrame;
     if (Math.abs(x - phx) <= 6) {
+      if (selectedFrames.size > 1 && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        try { collapseSelectionToPrimary(); } catch(_){ }
+      }
       tl.drag = { type:'scrub', startX:x };
       c.style.cursor = 'ew-resize';
       return;
@@ -4213,6 +4616,9 @@ function wireTimelineEvents(){
 
     // header scrub
     if (y <= tl.headerH){
+      if (selectedFrames.size > 1 && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        try { collapseSelectionToPrimary(); } catch(_){ }
+      }
       tl.drag = { type:'scrub', startX:x };
       tl.playhead = Math.max(0, timelinePosToFrame(x));
       seekToPlayhead();
@@ -4227,6 +4633,15 @@ function wireTimelineEvents(){
     if (!state.frames.length || !frameIndexAtX(x)){
       const absF = timelinePosToFrame(x);
       const idx = frameIndexFromAbsFrame(absF);
+      if (selectedFrames.size > 1 && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        // collapse multi-selection, keep playhead move, do not change selection to nearest
+        try { collapseSelectionToPrimary(); } catch(_){ }
+        tl.playhead = absF;
+        ensurePlayheadVisible();
+        updatePausedFromPlayhead();
+        renderTimeline();
+        return;
+      }
       if (idx >= 0){
         if (e.shiftKey && state.selected >= 0){
           const start = Math.min(state.selected, idx);
@@ -4256,7 +4671,7 @@ function wireTimelineEvents(){
        tl.drag = { type:'resize', frameIndex: hit.index, edge: 'end', startX: x, origDur: hit.dur };
        // if shift-resize, do not change selection; otherwise keep selection as-is
        if (!tl.selection.has(hit.index) && !e.shiftKey){
-         try { selectFrame(hit.index, e); } catch(_){}
+         try { selectFrame(hit.index, e); } catch(_){ }
        }
        c.style.cursor = 'ew-resize';
        return;
@@ -4273,11 +4688,27 @@ function wireTimelineEvents(){
       return;
     }
 
+    // If multi-selected and click on any frame without modifiers, collapse to that frame
+    if (selectedFrames.size > 1 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !nearEnd) {
+      try { selectFrame(hit.index, e); } catch(_){ }
+      renderTimeline();
+      // do not return; allow drag/copy setup below
+    }
+
+    // Ctrl/Meta click toggles selection for timeline items
+    if (e.ctrlKey || e.metaKey){
+      // rely on selectFrame to manage selectedFrames toggling logic consistently with sidebar
+      try { selectFrame(hit.index, e); } catch(_){ }
+      // tl.selection is synced by selectFrame
+      renderTimeline();
+      return;
+    }
+
     // normal select then drag/copy
     if (!tl.selection.has(hit.index)){
       if (!e.ctrlKey) tl.selection.clear();
       tl.selection.add(hit.index);
-      try { selectFrame(hit.index, e); } catch(_){}
+      try { selectFrame(hit.index, e); } catch(_){ }
       renderTimeline();
     }
     if (e.altKey) {
@@ -4372,6 +4803,10 @@ function wireTimelineEvents(){
 
   // Keyboard shortcuts in timeline area
   window.addEventListener('keydown', (e)=>{
+    // Skip timeline Ctrl+A when typing in inputs/textareas/contentEditable
+    const tgt = e.target || document.activeElement;
+    const isInputting = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable);
+    if (isInputting) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='a'){
       e.preventDefault();
       tl.selection.clear();
@@ -4401,7 +4836,9 @@ function seekToPlayhead(){
   for (let i=0;i<state.frames.length;i++){
     const dur = Math.max(1, state.frames[i].duration);
     if (tl.playhead < framesSoFar + dur){
-      selectFrame(i);
+      if (i !== state.selected) {
+        selectFrame(i);
+      }
       break;
     }
     framesSoFar += dur;
@@ -4450,6 +4887,142 @@ function animateTimelineMove(){
   renderTimeline();
   requestAnimationFrame(animateTimelineMove);
 }
+
+// Clear multi-selection when clicking stage or outside of any frame card
+function collapseSelectionToPrimary(){
+  if (selectedFrames.size <= 1) return;
+  const primary = clampIndex(state.selected);
+  selectedFrames.clear();
+  if (primary >= 0) selectedFrames.add(primary);
+  try { if (tl) { tl.selection = new Set([primary]); renderTimeline(); } } catch(_){ }
+  highlightSelected();
+}
+
+(function setupClickToUnselect(){
+  const stageEl = document.getElementById('stage');
+  if (stageEl) {
+    stageEl.addEventListener('click', (e)=>{
+      if (selectedFrames.size > 1) collapseSelectionToPrimary();
+    });
+  }
+  document.addEventListener('click', (e)=>{
+    if (selectedFrames.size <= 1) return;
+    const t = e.target;
+    // ignore clicks on a frame card or inside the timeline area
+    if (t.closest && (t.closest('.frame') || t.closest('#timelineContainer'))) return;
+    // if click is not inside the frames list area (or on any frame), clear
+    if (!t.closest || (!t.closest('#framesList') && !t.closest('.frame'))) {
+      collapseSelectionToPrimary();
+    }
+  });
+})();
+
+// NEW: TL controls wiring to same guidesState
+(function initTimelineGuides(){
+  const tlTgl = document.getElementById('tlToggleGuides');
+  const tlTr = document.getElementById('tlToggleRulers');
+  const tlAspect = document.getElementById('tlGuideAspect');
+  const tlTitle = document.getElementById('tlTitleSafePct');
+  const tlAction = document.getElementById('tlActionSafePct');
+  if (tlTgl) tlTgl.addEventListener('click', ()=>{ guidesState.enabled = !guidesState.enabled; applyGuideUI(); try { redrawPaths(); drawPreview(); drawOutsideRulers(); drawPreviewOutsideRulers(); } catch(e){} });
+  if (tlTr) tlTr.addEventListener('click', ()=>{ guidesState.rulers = !guidesState.rulers; applyGuideUI(); try { redrawPaths(); drawPreview(); drawOutsideRulers(); drawPreviewOutsideRulers(); } catch(e){} });
+  if (tlAspect) tlAspect.addEventListener('change', ()=>{
+    const v = (tlAspect.value || '1920x1080').split('x');
+    guidesState.artW = Number(v[0]) || 1920; guidesState.artH = Number(v[1]) || 1080; applyGuideUI();
+    try { redrawPaths(); drawPreview(); drawOutsideRulers(); drawPreviewOutsideRulers(); } catch(e){}
+  });
+  if (tlTitle) tlTitle.addEventListener('change', ()=>{ guidesState.titleSafePct = Math.max(50, Math.min(100, Number(tlTitle.value)||90)); applyGuideUI(); try { redrawPaths(); drawPreview(); drawOutsideRulers(); drawPreviewOutsideRulers(); } catch(e){} });
+  if (tlAction) tlAction.addEventListener('change', ()=>{ guidesState.actionSafePct = Math.max(50, Math.min(100, Number(tlAction.value)||95)); applyGuideUI(); try { redrawPaths(); drawPreview(); drawOutsideRulers(); drawPreviewOutsideRulers(); } catch(e){} });
+  // initial sync for TL controls
+  applyGuideUI();
+})();
+// ... existing code ...
+
+function drawTintedLinesFromImage(ctx, img, tintCss, alpha){
+   const cw = ctx.canvas && ctx.canvas.width ? ctx.canvas.width : drawCanvas.width;
+   const ch = ctx.canvas && ctx.canvas.height ? ctx.canvas.height : drawCanvas.height;
+   const off = document.createElement('canvas'); off.width = cw; off.height = ch;
+   const ox = off.getContext('2d');
+   // draw source fitted
+   try { drawImageCover(ox, img, cw, ch); } catch(_){ return; }
+   const data = ox.getImageData(0,0,cw,ch);
+   const arr = data.data;
+   const tint = hexToRgba(tintCss || '#ff0000');
+   const aBase = Math.max(0, Math.min(1, alpha == null ? 0.45 : alpha));
+   let any = false;
+   for (let i = 0; i < arr.length; i+=4) {
+     const r = arr[i], g = arr[i+1], b = arr[i+2], a = arr[i+3];
+     if (a < 16) { arr[i+3] = 0; continue; }
+     const br = 0.2126*r + 0.7152*g + 0.0722*b;
+     if (br > 245) { // near white -> transparent
+       arr[i+3] = 0; continue;
+     }
+     const w = (255 - br) / 255; // darker -> stronger
+     arr[i] = tint.r; arr[i+1] = tint.g; arr[i+2] = tint.b;
+     arr[i+3] = Math.max(0, Math.min(255, Math.round(255 * aBase * (0.35 + 0.65*w))));
+     if (!any && arr[i+3] > 4) any = true;
+   }
+   ox.putImageData(data,0,0);
+   ctx.save();
+   ctx.globalAlpha = 1;
+   ctx.drawImage(off,0,0);
+   ctx.restore();
+   return any;
+ }
+
+// -- preview image cache and prefetch helpers --
+let lastPreviewImage = null;
+let lastPreviewIndex = -1;
+function primeCacheAround(index, radius = 2) {
+  if (!Array.isArray(state.frames) || state.frames.length === 0) return;
+  const start = Math.max(0, index - radius);
+  const end = Math.min(state.frames.length - 1, index + radius);
+  for (let i = start; i <= end; i++) {
+    const f = state.frames[i];
+    if (f && f.thumb) ensureFrameImage(f);
+  }
+}
+
+// Safe fallback: returns a transparent canvas the same size; adjust to real mask implementation if available
+function createStrokeMaskCanvasFromContext(ctx, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  // If needed, we can derive mask from current drawCanvas content; for now leave transparent to avoid punching holes in onion
+  return c;
+}
+
+// Bitmap cache for onion skin to ensure neighbors show up reliably
+function ensureFrameBitmap(frame, refIndexForRerender) {
+  if (!frame || !frame.thumb) return;
+  if (frame._bmp) return;
+  if (frame._bmpPromise) return;
+  frame._bmpPromise = createBitmapFromSrc(frame.thumb).then(bmp => {
+    frame._bmp = bmp;
+    frame._bmpPromise = null;
+    // trigger overlay redraw once decoded
+    try {
+      if (drawDialog.classList.contains('open')) {
+        const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : (refIndexForRerender ?? state.selected);
+        renderOnionSkinsOverlay(typeof idx === 'number' ? idx : 0);
+      } else {
+        drawPreview();
+      }
+    } catch(_){}
+    return bmp;
+  }).catch(() => { frame._bmpPromise = null; });
+}
+
+function primeOnionNeighbors(centerIndex, radius = 3) {
+  if (!Array.isArray(state.frames) || state.frames.length === 0) return;
+  const order = [];
+  for (let i = 1; i <= radius; i++) {
+    order.push(centerIndex - i, centerIndex + i);
+  }
+  for (const idx of order) {
+    if (idx >= 0 && idx < state.frames.length) ensureFrameBitmap(state.frames[idx], centerIndex);
+  }
+ }
 </script>
 </body>
 </html>
