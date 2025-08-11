@@ -583,7 +583,13 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
         </div>
       </div>
       <div class="row"><label class="small-muted">FPS</label><input id="fpsInput" class="input" type="number" value="24" min="1" max="60" style="width:80px" autocomplete="off" /></div>
-      <div class="row"><label class="small-muted">Default Duration</label><input id="defaultDuration" class="input" type="number" value="24" min="1" style="width:80px" autocomplete="off" /></div>
+      <div class="row">
+        <label class="small-muted">Default Duration</label>
+        <input id="defaultDuration" class="input" type="number" value="24" min="1" style="width:80px" autocomplete="off" />
+        <button id="openShortcuts" class="icon-btn" title="Keyboard Shortcuts">
+          <i class='bx bx-help-circle'></i>
+        </button>
+      </div>
       <div style="margin-left:auto" class="row">
         <button class="btn" id="loopToggle" title="Loop"><i class='bx bx-repeat'></i> Loop</button>
         <button class="btn" id="restartPlay" title="Play from start"><i class='bx bx-rewind'></i> Restart</button>
@@ -720,6 +726,44 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
 <input type="file" id="uploader" accept="image/*" style="display:none" multiple />
 <input type="file" id="insertImageInput" accept="image/*" style="display:none" />
 <input type="file" id="loadProjectInput" accept="application/json" style="display:none" />
+
+<!-- Shortcuts Help Modal -->
+<div class="dialog" id="shortcutsDialog">
+  <div class="modal" style="min-width: 520px; max-width: calc(100vw - 40px);">
+    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; padding:8px 4px 12px 4px;">
+      <div style="display:flex; align-items:center; gap:8px; color:#e6eef8; font-weight:700;">
+        <i class='bx bx-keyboard'></i>
+        <span>Keyboard Shortcuts</span>
+      </div>
+      <button id="closeShortcuts" class="icon-btn" title="Close"><i class='bx bx-x'></i></button>
+    </div>
+    <div style="width:100%; color: var(--muted);">
+      <div class="small-muted" style="margin:6px 0 4px; font-weight:700; color:#e6eef8;">Global</div>
+      <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
+        <div>Undo</div><div><code>Ctrl</code> + <code>Z</code></div>
+        <div>Redo</div><div><code>Ctrl</code> + <code>Shift</code> + <code>Z</code></div>
+        <div>Redo (alt)</div><div><code>Ctrl</code> + <code>Y</code></div>
+        <div>Save project</div><div><code>Ctrl</code> + <code>S</code></div>
+        <div>Copy selected frame(s)</div><div><code>Ctrl</code> + <code>C</code></div>
+        <div>Cut selected frame(s)</div><div><code>Ctrl</code> + <code>X</code></div>
+        <div>Paste frame(s)</div><div><code>Ctrl</code> + <code>V</code></div>
+        <div>Play/Pause (when not typing)</div><div><code>Enter</code></div>
+      </div>
+      <div class="small-muted" style="margin:12px 0 4px; font-weight:700; color:#e6eef8;">Draw/Edit Modal</div>
+      <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
+        <div>Undo drawing</div><div><code>Ctrl</code> + <code>Z</code></div>
+        <div>Redo drawing</div><div><code>Ctrl</code> + <code>Shift</code> + <code>Z</code></div>
+        <div>Redo drawing (alt)</div><div><code>Ctrl</code> + <code>Y</code></div>
+        <div>Confirm</div><div><code>Enter</code></div>
+        <div>Cancel</div><div><code>Esc</code></div>
+      </div>
+      <div class="small-muted" style="margin:12px 0 4px; font-weight:700; color:#e6eef8;">Timeline</div>
+      <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
+        <div>Select all frames</div><div><code>Ctrl</code> + <code>A</code></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- INTRO OVERLAY -->
 <!-- Removed intro overlay popup -->
@@ -3396,25 +3440,36 @@ playBtn.addEventListener('click', togglePlayback);
 
 
 // ====================
-// Keyboard Shortcuts
+// Keyboard Shortcuts + Shortcuts Modal wiring
 // ====================
+const openShortcutsBtn = document.getElementById('openShortcuts');
+const shortcutsDialog = document.getElementById('shortcutsDialog');
+const closeShortcutsBtn = document.getElementById('closeShortcuts');
+
+function openShortcuts(){ if (shortcutsDialog) shortcutsDialog.classList.add('open'); }
+function closeShortcuts(){ if (shortcutsDialog) shortcutsDialog.classList.remove('open'); }
+
+if (openShortcutsBtn) openShortcutsBtn.addEventListener('click', (e)=>{ e.preventDefault(); openShortcuts(); });
+if (closeShortcutsBtn) closeShortcutsBtn.addEventListener('click', (e)=>{ e.preventDefault(); closeShortcuts(); });
+if (shortcutsDialog) { shortcutsDialog.addEventListener('click', (e)=>{ if (e.target === shortcutsDialog) closeShortcuts(); }); }
+
 window.addEventListener('keydown', e => {
   // --- Shortcuts for Drawing Modal ---
   if (drawDialog.classList.contains('open')) {
-    // Ctrl+Z for undo inside the modal
+    // Ctrl+Z / Ctrl+Shift+Z inside modal (Undo/Redo)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();
-      if (currentHistoryIndex > 0) {
-        restoreCanvasState(currentHistoryIndex - 1);
+      if (e.shiftKey) {
+        if (currentHistoryIndex < drawingHistory.length - 1) restoreCanvasState(currentHistoryIndex + 1);
+      } else {
+        if (currentHistoryIndex > 0) restoreCanvasState(currentHistoryIndex - 1);
       }
       return;
     }
-    // Ctrl+Y for redo inside the modal
+    // Ctrl+Y redo inside modal
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
       e.preventDefault();
-      if (currentHistoryIndex < drawingHistory.length - 1) {
-        restoreCanvasState(currentHistoryIndex + 1);
-      }
+      if (currentHistoryIndex < drawingHistory.length - 1) restoreCanvasState(currentHistoryIndex + 1);
       return;
     }
     // Enter to confirm
@@ -3431,13 +3486,21 @@ window.addEventListener('keydown', e => {
     }
   }
 
+  // If shortcuts modal is open, allow Esc to close it and stop further handling
+  if (shortcutsDialog && shortcutsDialog.classList.contains('open')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeShortcuts(); return; }
+  }
+
   const target = e.target || document.activeElement;
   const isInputting = (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable));
 
   // Global shortcuts: ignore while typing so text fields keep native behavior
   if (!isInputting && (e.ctrlKey || e.metaKey)) {
     switch(e.key.toLowerCase()) {
-      case 'z': e.preventDefault(); undo(); return;
+      case 'z':
+        e.preventDefault();
+        if (e.shiftKey) redo(); else undo();
+        return;
       case 'y': e.preventDefault(); redo(); return;
       case 's': e.preventDefault(); document.getElementById('saveProject').click(); return;
       case 'c': e.preventDefault(); copyFrames(); return;
@@ -3449,7 +3512,6 @@ window.addEventListener('keydown', e => {
   // Handle Enter key separately for playback vs. newline/confirm
   if (e.key === 'Enter') {
     if (isInputting) {
-      // In inputs: confirm/commit by blurring non-textarea inputs; allow newline in textarea
       if (target.tagName === 'INPUT') {
         e.preventDefault();
         try { target.blur(); } catch(_) {}
@@ -3458,33 +3520,6 @@ window.addEventListener('keydown', e => {
     }
     e.preventDefault();
     togglePlayback();
-    return;
-  }
-
-  // Stop other shortcuts if user is typing
-  if (isInputting || e.isComposing) return;
-
-  // Shortcuts that should NOT work while inputting
-  switch(e.key.toLowerCase()) {
-    case 'arrowright':
-      e.preventDefault();
-      selectFrame(clampIndex(state.selected + 1));
-      break;
-    case 'arrowleft':
-      e.preventDefault();
-      selectFrame(clampIndex(state.selected - 1));
-      break;
-    case 'd':
-      if (e.shiftKey) {
-        e.preventDefault();
-        duplicateSelectedFrames();
-      }
-      break;
-    case 'delete':
-    case 'backspace':
-      e.preventDefault();
-      deleteSelectedFrames();
-      break;
   }
 });
 
