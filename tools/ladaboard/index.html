@@ -1972,22 +1972,13 @@ function selectFrame(i, e = {}) {
     
     drawPreview();
 
-    // Sync timeline playhead to the start of selected frame IF not playing
+    // Keep timeline selection in sync without moving playhead
     try {
-      if (!playing && state.selected >= 0) {
-        let framesBefore = 0;
-        for (let k = 0; k < state.selected; k++) framesBefore += Math.max(1, state.frames[k].duration);
-        if (typeof tl !== 'undefined') {
-          tl.playhead = framesBefore;
-          tl.selection = new Set([state.selected]);
-          renderTimeline();
-        }
-      } else if (typeof tl !== 'undefined') {
-        // still sync selection highlight without moving playhead
+      if (typeof tl !== 'undefined') {
         tl.selection = new Set([state.selected]);
         renderTimeline();
       }
-    } catch(_){ }
+    } catch(_) { }
 
     // Auto-close sidebar on mobile after selection for better UX
     try { if (window.innerWidth <= 1024) { document.body.classList.remove('sidebar-open'); } } catch(_){}
@@ -4175,7 +4166,7 @@ function ensurePlayheadVisible(){
 }
 
 function timelinePosToFrame(px){
-  return Math.max(0, Math.round((px - tl.gutterW) / tl.pxPerFrame));
+  return Math.max(0, (px - tl.gutterW) / tl.pxPerFrame);
 }
 
 function frameIndexAtX(px){
@@ -4459,7 +4450,6 @@ function animateTimelineMove(){
   renderTimeline();
   requestAnimationFrame(animateTimelineMove);
 }
-// ... existing code ...
 </script>
 </body>
 </html>
