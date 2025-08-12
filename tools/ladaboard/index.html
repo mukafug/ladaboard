@@ -155,8 +155,9 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
-  width: 70%;
-  max-width: 260px;
+  width: auto;              /* was 70% */
+  max-width: none;          /* was 260px */
+  white-space: nowrap;      /* keep text in one line */
   transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
 }
 .empty-state .big-btn:hover {
