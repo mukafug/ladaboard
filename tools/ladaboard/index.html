@@ -4654,6 +4654,7 @@ function getTimelineTotalFrames(){
 (function initTimeline(){
   tl.canvas = document.getElementById('timelineCanvas');
   tl.scroller = document.getElementById('timelineScroller');
+  tl.container = document.getElementById('timelineContainer');
   if (!tl.canvas || !tl.scroller) return;
   tl.ctx = tl.canvas.getContext('2d');
   setTimelineSize();
@@ -4866,10 +4867,35 @@ function wireTimelineEvents(){
   const c = tl.canvas; if (!c) return;
 
   const zi = document.getElementById('tlZoomIn');
-  const zo = document.getElementById('tlZoomOut');
-  zi && zi.addEventListener('click', ()=>{ tl.zoom = Math.min(8, tl.zoom*1.25); updateTlScaleText(); renderTimeline(); });
-  zo && zo.addEventListener('click', ()=>{ tl.zoom = Math.max(0.25, tl.zoom/1.25); updateTlScaleText(); renderTimeline(); });
+const zo = document.getElementById('tlZoomOut');
+zi && zi.addEventListener('click', ()=>{ tl.zoom = Math.min(8, tl.zoom*1.25); updateTlScaleText(); renderTimeline(); });
+zo && zo.addEventListener('click', ()=>{ tl.zoom = Math.max(0.25, tl.zoom/1.25); updateTlScaleText(); renderTimeline(); });
 
+// Ctrl + Scroll: zoom di seluruh timeline container (toolbar + scroller + canvas)
+const wheelZoom = (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  const sc = tl.scroller; if (!sc) return;
+  const rect = sc.getBoundingClientRect();
+  let viewportX = e.clientX - rect.left;
+  viewportX = Math.max(0, Math.min(sc.clientWidth, viewportX)); // clamp ke lebar viewport scroller
+  const contentX = viewportX + sc.scrollLeft;
+  const anchorFrame = timelinePosToFrame(contentX);
+
+  const factor = e.deltaY < 0 ? 1.25 : (1/1.25);
+  const newZoom = Math.max(0.25, Math.min(8, tl.zoom * factor));
+  if (newZoom === tl.zoom) return;
+
+  tl.zoom = newZoom;
+  updateTlScaleText();
+  renderTimeline();
+
+  const newContentX = tl.gutterW + anchorFrame * tl.pxPerFrame;
+  sc.scrollLeft = Math.max(0, Math.round(newContentX - viewportX));
+};
+tl.scroller.addEventListener('wheel', wheelZoom, { passive:false });
+c.addEventListener('wheel', wheelZoom, { passive:false });
+if (tl.container) tl.container.addEventListener('wheel', wheelZoom, { passive:false });
   c.addEventListener('mousedown', (e)=>{
     const rect = c.getBoundingClientRect();
     const x = (e.clientX - rect.left);
