@@ -8,14 +8,14 @@
 <link rel="shortcut icon" href="https://raw.githubusercontent.com/mukafug/ladaboard/main/tools/ladaboard/assets/ladaboard.ico?v=2" />
 <!-- 
   STORYBOARD HTML - Onion Skin System
-  
+
   PERUBAHAN ONION SKIN:
   - Onion skin sekarang menggunakan overlay canvas terpisah (onionCanvas)
   - Onion skin tidak pernah tercampur dengan gambar utama (drawCanvas)
   - Onion skin hanya muncul di mode edit/draw
   - Preview dan export tidak menampilkan onion skin
   - Bitmap final hanya berisi gambar utama tanpa onion skin
-  
+
   Struktur Canvas:
   - drawCanvas (z-index: 1): Gambar utama + hasil drawing
   - onionCanvas (z-index: 2): Overlay onion skin (transparan, pointer-events: none)
@@ -2391,7 +2391,7 @@ function updateProjectInfo(){ totalFramesEl.textContent = String(state.frames.le
 function drawImageCover(ctx,img,w,h){ const ar = (img.width||1)/(img.height||1); const ar2 = w/h; let sx=0,sy=0,sw=img.width||w,sh=img.height||h; if(ar>ar2){ const nw=(img.height||h)*ar2; sx=((img.width||w)-nw)/2; sw=nw; } else { const nh = (img.width||w)/ar2; sy=((img.height||h)-nh)/2; sh=nh; } try{ ctx.drawImage(img,sx,sy,sw,sh,0,0,w,h); }catch(e){} }
 
 // ----- Replaced drawOverlayCanvas with wrapping-capable version -----
-function drawOverlayCanvas(title, elapsedMs) {
+function drawOverlayCanvas(title, elapsedMs, descIndexOverride) {
   const ctx = pctx;
   ctx.save();
 
@@ -2434,7 +2434,10 @@ function drawOverlayCanvas(title, elapsedMs) {
   reservedLeft += Math.max(wTime, wFps) + 24; // add gap after timestamp
 
   // Description (bottom-right) - multiline wrapping + auto box sizing
-  const desc = state.frames[state.selected]?.desc || '';
+  const idxForDesc = (typeof descIndexOverride === 'number' && descIndexOverride >= 0 && descIndexOverride < state.frames.length)
+    ? descIndexOverride
+    : state.selected;
+  const desc = state.frames[idxForDesc]?.desc || '';
   if (desc) {
     ctx.font = '24px "Segoe UI", sans-serif';
     const pad = 16;
@@ -2482,7 +2485,7 @@ function drawPreview(){
       pctx.drawImage(temp,0,0);
     } catch(_){ }
     drawGuides(pctx, preview.width, preview.height);
-    drawOverlayCanvas('No cut selected',0); 
+    drawOverlayCanvas('No cut selected',0,-1); 
     return; 
   }
 
@@ -2512,7 +2515,7 @@ function drawPreview(){
   // Guides + rulers + overlay
     drawGuides(pctx, preview.width, preview.height);
   try { drawPreviewOutsideRulers(); } catch(_){ }
-    drawOverlayCanvas('Cut no. ' + (sel+1), 0); 
+    drawOverlayCanvas('Cut no. ' + (sel+1), 0, sel); 
 
   if (ready) { lastPreviewImage = img; lastPreviewIndex = sel; }
 }
@@ -3870,7 +3873,7 @@ function playbackLoop() {
         pctx.fillRect(0, 0, preview.width, preview.height);
     }
     try { drawGuides(pctx, preview.width, preview.height); } catch(e) {}
-        drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed);
+        drawOverlayCanvas('Cut no. ' + (currentFrameIndex + 1), elapsed, currentFrameIndex);
 
     if (ready) { lastPreviewImage = img; lastPreviewIndex = currentFrameIndex; }
 
