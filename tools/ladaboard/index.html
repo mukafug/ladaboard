@@ -792,6 +792,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
         <div>Redo drawing</div><div><code>Ctrl</code> + <code>Shift</code> + <code>Z</code></div>
         <div>Redo drawing (alt)</div><div><code>Ctrl</code> + <code>Y</code></div>
         <div>Confirm</div><div><code>Enter</code> / <code>Tab</code></div>
+        <div>Confirm + New frame</div><div><code>Shift</code> + <code>D</code></div>
         <div>Cancel</div><div><code>Esc</code></div>
       </div>
       <div class="small-muted" style="margin:12px 0 4px; font-weight:700; color:#e6eef8;">Timeline</div>
@@ -929,6 +930,12 @@ const state = { frames: [], selected: -1, fps: 24, defaultDuration: 24, mode: 'd
 let editIndex = null; // Used for the drawing modal
 let selectedFrames = new Set();
 let clipboardFrames = [];
+// When true, after confirming a draw/edit, reopen a fresh draw modal for a new frame
+let chainNewFrameAfterConfirm = false;
+// Stable ref index for onion-skin redraws during async image decodes
+let currentOnionRefIndex = null;
+// Prevent overlapping confirm actions (e.g. when spamming Shift+D)
+let confirmInProgress = false;
 
 // Variabel global untuk musik
 let musicAudio = null;
@@ -1518,6 +1525,14 @@ function drawPreviewOutsideRulers() {
 let onionEnabled = JSON.parse(localStorage.getItem('ladaboard.onionEnabled') || 'true');
 let onionBackCount = 2;
 let onionFwdCount = 2;
+// Track onion overlay state to avoid flicker on partial async loads
+let lastOnionRefIndex = null;
+let onionDrawnNeighbors = new Set();
+function resetOnionOverlayState() {
+  try { octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height); } catch(_) {}
+  lastOnionRefIndex = null;
+  onionDrawnNeighbors = new Set();
+}
 
 // helper to clamp
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
@@ -1546,10 +1561,11 @@ function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
   if (toggle) toggle.addEventListener('click', ()=>{ 
     onionEnabled = !onionEnabled;
     localStorage.setItem('ladaboard.onionEnabled', onionEnabled); // Save state
+    resetOnionOverlayState();
     updateUI();
   });
-  if (backInput) backInput.addEventListener('change', ()=>{ onionBackCount = clamp(Number(backInput.value), 0, 10); updateUI(); });
-  if (fwdInput) fwdInput.addEventListener('change', ()=>{ onionFwdCount = clamp(Number(fwdInput.value), 0, 10); updateUI(); });
+  if (backInput) backInput.addEventListener('change', ()=>{ onionBackCount = clamp(Number(backInput.value), 0, 10); resetOnionOverlayState(); updateUI(); });
+  if (fwdInput) fwdInput.addEventListener('change', ()=>{ onionFwdCount = clamp(Number(fwdInput.value), 0, 10); resetOnionOverlayState(); updateUI(); });
   updateUI();
 })();
 
@@ -1570,6 +1586,7 @@ function syncOnionUIElements(){
   if (tlToggle) tlToggle.addEventListener('click', ()=>{
     onionEnabled = !onionEnabled;
     localStorage.setItem('ladaboard.onionEnabled', onionEnabled);
+    resetOnionOverlayState();
     syncOnionUIElements();
     // also reflect to modal button if present
     const toggle = document.getElementById('toggleOnion');
@@ -1578,6 +1595,7 @@ function syncOnionUIElements(){
   });
   if (tlBack) tlBack.addEventListener('change', ()=>{
     onionBackCount = clamp(Number(tlBack.value), 0, 10);
+    resetOnionOverlayState();
     syncOnionUIElements();
     const backInput = document.getElementById('onionBackInput');
     if (backInput) backInput.value = String(onionBackCount);
@@ -1585,6 +1603,7 @@ function syncOnionUIElements(){
   });
   if (tlFwd) tlFwd.addEventListener('change', ()=>{
     onionFwdCount = clamp(Number(tlFwd.value), 0, 10);
+    resetOnionOverlayState();
     syncOnionUIElements();
     const fwdInput = document.getElementById('onionFwdInput');
     if (fwdInput) fwdInput.value = String(onionFwdCount);
@@ -1621,7 +1640,10 @@ function ensureFrameImage(frame){
     if(drawDialog.classList.contains('open')) { 
       try { 
         redrawPaths(); 
-        const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+        // Prefer stable ref index captured by openDraw
+        const idx = (typeof currentOnionRefIndex === 'number' && currentOnionRefIndex >= 0)
+          ? currentOnionRefIndex
+          : ((typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length);
         renderOnionSkinsOverlay(idx);
       } catch(_){} 
     }
@@ -1645,7 +1667,7 @@ function renderOnionSkinsToContext(ctx, refIndex){
     const srcImg = f._bmp || ensureFrameImage(f);
     if (!f._bmp) ensureFrameBitmap(f, refIndex); // kick async decode
     const alpha = 0.45 * (1 - (i-1) / Math.max(1, onionBackCount));
-    const ok = drawTintedLinesFromImage(ctx, srcImg, 'rgba(255,120,90,1)', alpha);
+    const ok = drawOnionTintedCached(ctx, f, true, alpha);
     if (!ok) drawThumbInto(ctx, srcImg, alpha, 'rgba(255,120,90,0.18)');
   }
 
@@ -1657,7 +1679,7 @@ function renderOnionSkinsToContext(ctx, refIndex){
     const srcImg = f._bmp || ensureFrameImage(f);
     if (!f._bmp) ensureFrameBitmap(f, refIndex);
     const alpha = 0.45 * (1 - (i-1) / Math.max(1, onionFwdCount));
-    const ok = drawTintedLinesFromImage(ctx, srcImg, 'rgba(110,230,200,1)', alpha);
+    const ok = drawOnionTintedCached(ctx, f, false, alpha);
     if (!ok) drawThumbInto(ctx, srcImg, alpha, 'rgba(110,230,200,0.16)');
   }
 }
@@ -1665,13 +1687,91 @@ function renderOnionSkinsToContext(ctx, refIndex){
 // Fungsi baru untuk render onion skin ke overlay canvas terpisah
 // Fungsi ini memastikan onion skin tidak tercampur dengan gambar utama dan tidak menimpa garis aktif
 function renderOnionSkinsOverlay(refIndex) {
-  octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
-  if (!onionEnabled) return;
+  if (!onionEnabled) {
+    try { octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height); } catch(_) {}
+    lastOnionRefIndex = null;
+    onionDrawnNeighbors.clear();
+    return;
+  }
   if (typeof refIndex !== 'number' || refIndex < 0) return;
-  // Prefetch neighbor frames to avoid missing skins while decoding (prioritize immediate neighbors)
-  try { primeOnionNeighbors(refIndex); } catch(_){}
-  renderOnionSkinsToContext(octx, refIndex);
-  // punch out current strokes so active lines stay crisp
+
+  // Build desired neighbor indices
+  const desired = [];
+  for (let i = 1; i <= onionBackCount; i++) { const idx = refIndex - i; if (idx >= 0 && idx < state.frames.length) desired.push(idx); }
+  for (let i = 1; i <= onionFwdCount; i++) { const idx = refIndex + i; if (idx >= 0 && idx < state.frames.length) desired.push(idx); }
+  const desiredSet = new Set(desired);
+
+  // If ref index changed or set contains indices we no longer want, force a clean redraw
+  let needFullRedraw = (lastOnionRefIndex !== refIndex);
+  if (!needFullRedraw) {
+    for (const drawn of onionDrawnNeighbors) {
+      if (!desiredSet.has(drawn)) { needFullRedraw = true; break; }
+    }
+  }
+
+  // Determine readiness
+  const isReady = (idx)=>{
+    const f = state.frames[idx];
+    if (!f) return false;
+    if (f._bmp) return true;
+    if (f._img && f._img.complete && f._img.naturalWidth > 0) return true;
+    return false;
+  };
+  const readySet = new Set(desired.filter(isReady));
+  const allReady = desired.length > 0 ? desired.every(isReady) : true;
+
+  if (needFullRedraw) {
+    // Full clear and redraw what we have ready right now (avoid stale neighbors)
+    octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
+    onionDrawnNeighbors.clear();
+    lastOnionRefIndex = refIndex;
+    for (const idx of readySet) {
+      try {
+        const f = state.frames[idx];
+        const srcImg = f._bmp || f._img;
+        const rank = Math.abs(refIndex - idx);
+        const alpha = 0.45 * (1 - (rank-1) / Math.max(1, rank <= onionBackCount ? onionBackCount : onionFwdCount));
+        const warm = idx < refIndex;
+        const ok = drawOnionTintedCached(octx, f, warm, alpha);
+        if (!ok) drawThumbInto(octx, srcImg, alpha, warm ? 'rgba(255,120,90,0.18)' : 'rgba(110,230,200,0.16)');
+        onionDrawnNeighbors.add(idx);
+      } catch(_) {}
+    }
+  } else {
+    // Incremental: draw only newly-ready neighbors, do not clear to avoid flicker
+    for (const idx of readySet) {
+      if (onionDrawnNeighbors.has(idx)) continue;
+      try {
+        const f = state.frames[idx];
+        const srcImg = f._bmp || f._img;
+        const rank = Math.abs(refIndex - idx);
+        const alpha = 0.45 * (1 - (rank-1) / Math.max(1, rank <= onionBackCount ? onionBackCount : onionFwdCount));
+        const warm = idx < refIndex;
+        const ok = drawOnionTintedCached(octx, f, warm, alpha);
+        if (!ok) drawThumbInto(octx, srcImg, alpha, warm ? 'rgba(255,120,90,0.18)' : 'rgba(110,230,200,0.16)');
+        onionDrawnNeighbors.add(idx);
+      } catch(_) {}
+    }
+    // If later all neighbors are ready, do a clean pass to normalize overlay
+    if (allReady) {
+      octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
+      onionDrawnNeighbors.clear();
+      for (const idx of desired) {
+        try {
+          const f = state.frames[idx];
+          const srcImg = f._bmp || f._img;
+          const rank = Math.abs(refIndex - idx);
+          const alpha = 0.45 * (1 - (rank-1) / Math.max(1, rank <= onionBackCount ? onionBackCount : onionFwdCount));
+          const warm = idx < refIndex;
+          const ok = drawOnionTintedCached(octx, f, warm, alpha);
+          if (!ok) drawThumbInto(octx, srcImg, alpha, warm ? 'rgba(255,120,90,0.18)' : 'rgba(110,230,200,0.16)');
+          onionDrawnNeighbors.add(idx);
+        } catch(_) {}
+      }
+    }
+  }
+
+  // punch out current strokes so active lines stay crisp (optional, mask is empty by default)
   try {
     const mask = createStrokeMaskCanvasFromContext(dctx, drawCanvas.width, drawCanvas.height);
     octx.save();
@@ -2420,7 +2520,7 @@ function drawPreview(){
 // drawing modal (improved)
 function openDraw(initial = null){
   drawDialog.classList.add('open');
-
+  resetOnionOverlayState();
   // reset drawing state and initialize new bitmap system
   baseImage = null;
   
@@ -2448,12 +2548,14 @@ function openDraw(initial = null){
   // Prefetch onion neighbors for the frame being edited (prioritize immediate)
   try { 
     const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+    currentOnionRefIndex = idx;
     if (idx != null) primeOnionNeighbors(idx);
   } catch(_){}
 
   // draw initial onion
   try { 
     const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+    currentOnionRefIndex = idx;
     renderOnionSkinsOverlay(idx); 
   } catch(_){ }
 
@@ -2466,6 +2568,7 @@ function openDraw(initial = null){
       try { 
         redrawPaths(); 
         const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+        currentOnionRefIndex = idx;
         renderOnionSkinsOverlay(idx); 
         drawOutsideRulers(); 
       } catch(e){}
@@ -2473,6 +2576,7 @@ function openDraw(initial = null){
         try { 
           redrawPaths(); 
           const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : state.frames.length;
+          currentOnionRefIndex = idx;
           renderOnionSkinsOverlay(idx); 
           drawOutsideRulers(); 
         } catch(e){}
@@ -2518,6 +2622,9 @@ function closeDraw(){
   try { drawCanvas.style.background = 'transparent'; } catch(_){}
   // hide outside rulers
   try { const rt = document.getElementById('rulerTop'); const rl = document.getElementById('rulerLeft'); if (rt) rt.style.display = 'none'; if (rl) rl.style.display = 'none'; } catch(_){ }
+  // clear stable ref index
+  currentOnionRefIndex = null;
+  resetOnionOverlayState();
 }
 
 // toolbar events
@@ -2841,45 +2948,94 @@ document.getElementById('redoBtn').addEventListener('click',()=>{
 document.getElementById('clearBtn').addEventListener('click',()=>{ clearCanvas(); });
 document.getElementById('cancelDraw').addEventListener('click',()=>{ closeDraw(); });
 document.getElementById('confirmDraw').addEventListener('click',async ()=>{
-  pushHistory();
+  if (confirmInProgress) return;
+  confirmInProgress = true;
+  try {
+    pushHistory();
+    
+    // Buat temporary canvas untuk menyimpan gambar final tanpa onion skin
+    const temp = document.createElement('canvas');
+    temp.width = drawCanvas.width;
+    temp.height = drawCanvas.height;
+    const tctx = temp.getContext('2d');
   
-  // Buat temporary canvas untuk menyimpan gambar final tanpa onion skin
-  const temp = document.createElement('canvas');
-  temp.width = drawCanvas.width;
-  temp.height = drawCanvas.height;
-  const tctx = temp.getContext('2d');
-
-  // Fill white background so eraser reveals white instead of black/transparent
-  tctx.fillStyle = '#ffffff';
-  tctx.fillRect(0, 0, temp.width, temp.height);
-
-  // Base image tanpa onion skin (opsional, akan tertutup oleh drawCanvas jika ada)
-  if(baseImage){
-    drawImageCover(tctx, baseImage, temp.width, temp.height);
+    // Fill white background so eraser reveals white instead of black/transparent
+    tctx.fillStyle = '#ffffff';
+    tctx.fillRect(0, 0, temp.width, temp.height);
+  
+    // baseImage is not drawn here to ensure eraser holes remain effective in edit mode
+     
+    // Gambar konten utama dari drawCanvas terlebih dahulu (sudah termasuk background putih dan coretan)
+    tctx.drawImage(drawCanvas,0,0);
+    
+    // Jika ada gambar yang sedang di-insert (belum di-Apply), komposit TERAKHIR supaya tidak ketutup
+    if (insertImage) {
+      drawTransformedImageOnly(tctx);
+    }
+    
+    // Ambil data URL dari temporary canvas (tanpa onion skin)
+    const data = temp.toDataURL('image/png');
+    
+    // Determine index being saved (before modifying frames)
+    const targetIndex = (editIndex !== null) ? editIndex : state.frames.length;
+  
+    // Try to create a bitmap upfront to avoid onion-skin decode flicker on next modal
+    let bmp = null;
+    try {
+      if (window.createImageBitmap) {
+        bmp = await createImageBitmap(temp);
+      }
+    } catch(_) {}
+    // Fallback to using the canvas itself so we can draw immediately without decode delay
+    if (!bmp) bmp = temp;
+    
+    if(editIndex !== null){ 
+      state.frames[editIndex].thumb = data;
+      state.frames[editIndex]._img = null;
+      delete state.frames[editIndex]._onionCache;
+      if (bmp) state.frames[editIndex]._bmp = bmp;
+      selectFrame(editIndex);
+      editIndex = null;
+    } else {
+      state.frames.push({ thumb: data, desc: '', duration: Math.max(1,safeNumber(state.defaultDuration,24)) });
+      if (bmp) state.frames[targetIndex]._bmp = bmp;
+      delete state.frames[targetIndex]._onionCache;
+      selectFrame(state.frames.length-1);
+    }
+    renderList();
+    saveAuto();
+  
+    // If chaining is requested (Shift+D in modal), start a fresh frame without closing the dialog to avoid blink
+    if (chainNewFrameAfterConfirm) {
+      chainNewFrameAfterConfirm = false;
+      // Fresh blank canvas
+      baseImage = null;
+      insertImage = null; // stop active insert
+      try { ictx.clearRect(0, 0, insertCanvas.width, insertCanvas.height); } catch(_) {}
+      try { if (applyImageBtn) applyImageBtn.style.display = 'none'; } catch(_) {}
+  
+      // Reset drawing history and canvas content
+      dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+      dctx.fillStyle = '#fff';
+      dctx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
+      initDrawingCanvas();
+  
+      // Update onion ref to the new (next) frame index
+      currentOnionRefIndex = state.frames.length; // next frame logical index
+      try { primeOnionNeighbors(currentOnionRefIndex); } catch(_) {}
+      try { renderOnionSkinsOverlay(currentOnionRefIndex); } catch(_) {}
+      try { drawOutsideRulers(); } catch(_) {}
+  
+      // Focus canvas so keys keep working
+      try { drawCanvas.focus(); } catch(_) {}
+      return; // keep modal open
+    }
+  
+    // Not chaining: close modal as usual
+    closeDraw();
+  } finally {
+    confirmInProgress = false;
   }
-  
-  // Gambar konten utama dari drawCanvas terlebih dahulu (sudah termasuk background putih dan coretan)
-  tctx.drawImage(drawCanvas,0,0);
-  
-  // Jika ada gambar yang sedang di-insert (belum di-Apply), komposit TERAKHIR supaya tidak ketutup
-  if (insertImage) {
-    drawTransformedImageOnly(tctx);
-  }
-  
-  // Ambil data URL dari temporary canvas (tanpa onion skin)
-  const data = temp.toDataURL('image/png');
-  
-  if(editIndex !== null){ 
-    state.frames[editIndex].thumb = data;
-    selectFrame(editIndex);
-    editIndex = null;
-  } else {
-    state.frames.push({ thumb: data, desc: '', duration: Math.max(1,safeNumber(state.defaultDuration,24)) });
-    selectFrame(state.frames.length-1);
-  }
-  renderList();
-  closeDraw();
-  saveAuto();
 });
 
 // mode and add frame
@@ -3824,15 +3980,25 @@ window.addEventListener('keydown', e => {
       if (currentHistoryIndex < drawingHistory.length - 1) restoreCanvasState(currentHistoryIndex + 1);
       return;
     }
+    // Shift+D: Confirm current and immediately start a new frame
+    if (e.shiftKey && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      if (confirmInProgress) return;
+      chainNewFrameAfterConfirm = true;
+      document.getElementById('confirmDraw').click();
+      return;
+    }
     // Enter to confirm
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (confirmInProgress) return;
       document.getElementById('confirmDraw').click();
       return;
     }
     // Tab to confirm as well while in draw/edit modal
     if (e.key === 'Tab') {
       e.preventDefault();
+      if (confirmInProgress) return;
       document.getElementById('confirmDraw').click();
       return;
     }
@@ -5003,7 +5169,9 @@ function ensureFrameBitmap(frame, refIndexForRerender) {
     // trigger overlay redraw once decoded
     try {
       if (drawDialog.classList.contains('open')) {
-        const idx = (typeof editIndex === 'number' && editIndex != null) ? editIndex : (refIndexForRerender ?? state.selected);
+        const idx = (typeof currentOnionRefIndex === 'number' && currentOnionRefIndex >= 0)
+          ? currentOnionRefIndex
+          : ((typeof editIndex === 'number' && editIndex != null) ? editIndex : (refIndexForRerender ?? state.selected));
         renderOnionSkinsOverlay(typeof idx === 'number' ? idx : 0);
       } else {
         drawPreview();
@@ -5023,6 +5191,62 @@ function primeOnionNeighbors(centerIndex, radius = 3) {
     if (idx >= 0 && idx < state.frames.length) ensureFrameBitmap(state.frames[idx], centerIndex);
   }
  }
+
+// Fast path: cached, downscaled onion mask per frame (warm/cool), then scaled up on draw
+function drawOnionTintedCached(ctx, frame, isWarm, aBase){
+  try {
+    if (!frame) return false;
+    const cw = (ctx.canvas && ctx.canvas.width) ? ctx.canvas.width : drawCanvas.width;
+    const ch = (ctx.canvas && ctx.canvas.height) ? ctx.canvas.height : drawCanvas.height;
+    const img = frame._bmp || (frame._img && frame._img.complete && frame._img.naturalWidth > 0 ? frame._img : null);
+    if (!img) return false;
+
+    if (!frame._onionCache || frame._onionCache.src !== frame.thumb) {
+      frame._onionCache = { src: frame.thumb, warm: null, cool: null, w: 0, h: 0 };
+    }
+
+    const key = isWarm ? 'warm' : 'cool';
+    const targetAspect = cw / Math.max(1, ch);
+    const PROC_W = 256; // low-res processing width (fast)
+    const PROC_H = Math.max(1, Math.round(PROC_W / targetAspect));
+
+    let mask = frame._onionCache[key];
+    if (!mask || frame._onionCache.w !== PROC_W || frame._onionCache.h !== PROC_H) {
+      const off = document.createElement('canvas');
+      off.width = PROC_W; off.height = PROC_H;
+      const ox = off.getContext('2d');
+      try { drawImageCover(ox, img, PROC_W, PROC_H); } catch(_) { return false; }
+      const data = ox.getImageData(0, 0, PROC_W, PROC_H);
+      const arr = data.data;
+      const tint = isWarm ? { r:255, g:120, b:90 } : { r:110, g:230, b:200 };
+      for (let i = 0; i < arr.length; i += 4) {
+        const a = arr[i+3];
+        if (a < 16) { arr[i+3] = 0; continue; }
+        const r = arr[i], g = arr[i+1], b = arr[i+2];
+        const br = 0.2126*r + 0.7152*g + 0.0722*b;
+        if (br > 245) { arr[i+3] = 0; continue; }
+        const w = (255 - br) / 255; // darker -> stronger
+        arr[i] = tint.r; arr[i+1] = tint.g; arr[i+2] = tint.b;
+        // store normalized alpha (aBase applied at draw time)
+        arr[i+3] = Math.max(0, Math.min(255, Math.round(255 * (0.35 + 0.65*w))));
+      }
+      ox.putImageData(data, 0, 0);
+      frame._onionCache[key] = off;
+      frame._onionCache.w = PROC_W;
+      frame._onionCache.h = PROC_H;
+      mask = off;
+    }
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, aBase == null ? 0.45 : aBase));
+    try { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'medium'; } catch(_){}
+    ctx.drawImage(mask, 0, 0, cw, ch);
+    ctx.restore();
+    return true;
+  } catch(_) { return false; }
+}
+// ... existing code ...
+
 </script>
 </body>
 </html>
