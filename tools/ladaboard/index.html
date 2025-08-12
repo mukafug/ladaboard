@@ -26,19 +26,28 @@
 :root{--bg:#0f1115;--panel:#141619;--muted:#9aa3b2;--accent:#d9fa00;--accent-2:#d9fa00;}
 *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,system-ui,Arial}
 html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0e 0%, #0f1115 100%);color:#e6eef8}
+/* Hide browser's default viewport scrollbar but keep scrolling */
+html, body { 
+  -ms-overflow-style: none; /* IE/old Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar { 
+  width: 0; 
+  height: 0; 
+}
 .app {
   display: flex; /* ubah dari grid ke flexbox */
-  gap: 18px;
-  padding: 18px;
-  height: 100vh;
+  gap: clamp(10px, 1.8vw, 18px);
+  padding: clamp(10px, 1.8vw, 18px);
+  min-height: 100dvh;
   align-items: flex-start; /* penting untuk sticky positioning */
 }
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 360px; /* fixed width untuk sidebar */
+  width: clamp(260px, 24vw, 360px); /* fluid width */
   flex-shrink: 0; /* mencegah sidebar menyusut */
-  height: 100vh; /* full height */
+  height: auto; /* avoid forcing full viewport height */
   background: var(--panel);
   border-radius: 10px;
   padding: 12px;
@@ -46,13 +55,13 @@ html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0e 0%, #0f
   box-shadow: 0 6px 18px rgba(0,0,0,0.6);
   overflow: hidden; /* mencegah sidebar scroll */
 }
-.header{display:flex;gap:8px;align-items:center}
-.logo{padding:8px 12px;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:8px;font-weight:700;color:#000}
-.controls{display:flex;gap:8px;margin-left:auto}
-.btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:var(--muted);cursor:pointer; display:inline-flex; align-items:center; gap: 6px;}
+.header{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;justify-content:space-between;min-width:0; position:relative}
+.logo{padding:8px 12px;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:8px;font-weight:700;color:#000;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;line-height:1;min-width:0; z-index:1}
+.controls{display:flex;gap:8px;margin-left:auto;flex-shrink:0}
+.btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:var(--muted);cursor:pointer; display:inline-flex; align-items:center; gap: 6px; white-space:nowrap}
 .btn:hover{border-color: var(--accent); background: rgba(217,250,0,0.08); color:#fff; box-shadow: 0 6px 16px rgba(217,250,0,0.08)}
 .btn:focus-visible{outline:none; box-shadow:0 0 0 2px rgba(217,250,0,0.55)}
-.mode-toggle{position:relative;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:4px;--pos:0;min-width:160px}
+.mode-toggle{position:relative;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:4px;--pos:0;min-width:clamp(120px,22vw,160px)}
 .mode-toggle .toggle-thumb{position:absolute;top:4px;left:4px;width:calc(50% - 0px);height:calc(100% - 8px);background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.35);transform:translateX(calc(var(--pos)*100%));transition:transform 220ms cubic-bezier(.2,.8,.2,1),width 220ms}
 .mode-toggle button{position:relative;z-index:1;background:transparent;border:none;cursor:pointer;padding:8px 14px;border-radius:8px;color:var(--muted);font-weight:700}
 .mode-toggle .active{color:#071017}
@@ -85,30 +94,31 @@ html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0e 0%, #0f
   flex-direction: column;
   gap: 10px;
   position: sticky;
-  top: 18px; /* biar nempel di atas */
-  flex: 1; /* ambil sisa ruang yang tersedia */
-  max-width: calc(100vw - 396px); /* 360px sidebar + 18px gap + 18px padding */
+  top: clamp(8px, 1.2vw, 18px); /* biar nempel di atas */
+  flex: 1 1 auto; /* ambil sisa ruang yang tersedia */
+  max-width: 100%;
+  min-width: 0; /* allow children to shrink properly */
   height: fit-content; /* tinggi sesuai konten */
   overflow: visible; /* pastikan tidak ada overflow yang mengganggu sticky */
 }
-.canvas-stage{background:#050607;border-radius:8px;aspect-ratio:16/9;width:100%;max-height:70vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.canvas-stage{background:#050607;border-radius:8px;aspect-ratio:16/9;width:100%;max-height:70dvh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
 .canvas-stage canvas{width:100%;height:100%;object-fit:contain;background:#000;border-radius:4px}
-.toolbar{display:flex;gap:8px;align-items:center}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;row-gap:8px;overflow-x:auto}
 .input{padding:8px;border-radius:6px;background:#0b0c0d;border:1px solid rgba(255,255,255,0.03);color:var(--muted);font-family:inherit}
 .row{display:flex;gap:8px;align-items:center}
 .footer{display:flex;justify-content:space-between;align-items:center;padding-top:8px}
 .file-actions{display:flex;gap:8px}
 /* File dropdown styles */
-.toolbar .dropdown{position:relative}
-.dropdown-menu{position:absolute;top:100%;left:0;background:var(--panel);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:6px;display:none;min-width:200px;box-shadow:0 12px 30px rgba(0,0,0,0.6);z-index:1300}
+.toolbar .dropdown{position:relative; z-index: 2100}
+.dropdown-menu{position:absolute;top:100%;left:0;background:var(--panel);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:6px;display:none;min-width:200px;box-shadow:0 12px 30px rgba(0,0,0,0.6);z-index:2300}
 .dropdown.open .dropdown-menu{display:block}
 .dropdown-menu .btn{width:100%;justify-content:flex-start}
 .badge{background:rgba(255,255,255,0.04);padding:6px 8px;border-radius:6px;color:var(--muted)}
-.dialog{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:999}
+.dialog{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:999;padding:12px;overflow:hidden}
 .dialog.open{display:flex;touch-action:none}
-.modal{width:920px;background:var(--panel);border-radius:8px;padding:8px;box-shadow:0 20px 60px rgba(0,0,0,0.7)}
-.modal{display:inline-flex;flex-direction:column;align-items:center;width:auto;max-width:calc(100vw - 40px);background:var(--panel);border-radius:8px;padding:8px;box-shadow:0 20px 60px rgba(0,0,0,0.7)}
-.canvas-toolbar{display:flex;gap:8px;align-items:center;padding:8px}
+.modal{width:min(920px, 100%);background:var(--panel);border-radius:8px;padding:8px;box-shadow:0 20px 60px rgba(0,0,0,0.7);max-width:calc(100vw - 40px);overflow:visible;transform-origin: top center;transform: scale(var(--modal-scale, 1));will-change: transform; padding-bottom: 14px; }
+.modal{display:inline-flex;flex-direction:column;align-items:center;width:auto;max-width:calc(100vw - 40px);background:var(--panel);border-radius:8px;padding:8px;box-shadow:0 20px 60px rgba(0,0,0,0.7);transform-origin: top center;transform: scale(var(--modal-scale, 1));}
+.canvas-toolbar{display:flex;gap:8px;align-items:center;padding:8px;flex-wrap:wrap;row-gap:8px;overflow-x:auto}
 .toolbtn{padding:6px;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer; font-size: 20px; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center;}
 .toolbtn:hover{background: rgba(217,250,0,0.08); color:#fff; box-shadow: 0 6px 16px rgba(217,250,0,0.08)}
 .toolbtn:focus-visible{outline:none; box-shadow:0 0 0 2px rgba(217,250,0,0.55)}
@@ -367,18 +377,16 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
 .mobile-only { display: none; }
 
 @media (max-width: 1600px) {
-  .app { gap: 16px; padding: 16px; }
-  .sidebar { width: 340px; }
-  .canvas-stage { max-height: 68vh; }
+  .app { gap: clamp(10px, 1.4vw, 16px); padding: clamp(10px, 1.4vw, 16px); }
+  .sidebar { width: clamp(260px, 22vw, 340px); }
+  .canvas-stage { max-height: 68dvh; }
 }
 
-@media (max-width: 1366px) {
-  /* Ensure 100% zoom equivalent layout fits 1366p width */
-  .app { gap: 12px; padding: 10px; }
-  .sidebar { width: 280px; }
+@media (max-width: 1280px) {
+  .sidebar { width: clamp(240px, 28vw, 320px); }
   .toolbar { flex-wrap: wrap; row-gap: 8px; overflow-x: auto; }
-  .mode-toggle { min-width: 140px; }
-  .canvas-stage { max-height: 66vh; }
+  .mode-toggle { min-width: clamp(120px, 28vw, 150px); }
+  .canvas-stage { max-height: 66dvh; }
   .truncate { max-width: 360px; }
 }
 
@@ -394,7 +402,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
     left: 0; top: 0; bottom: 0;
     width: min(92vw, 420px);
     max-width: 420px;
-    height: 100vh;
+    height: 100dvh;
     transform: translateX(-110%);
     transition: transform .25s ease;
     z-index: 1750;
@@ -424,7 +432,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
     padding: 10px;
     max-height: 70vh;
     overflow-y: auto;
-    z-index: 2000; /* above sidebar backdrop */
+    z-index: 2400; /* above sidebar backdrop */
   }
   /* stack submenu content vertically on mobile */
   #fileDropdown .submenu-menu {
@@ -485,12 +493,12 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
   background: var(--panel);
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 10px;
-  margin-top: 22px; /* push down a bit so stamps not cramped */
+  margin-top: 12px; /* tighter gap under preview */
   overflow: hidden;
 }
 .timeline-toolbar { 
   display:flex; align-items:center; justify-content:space-between; 
-  padding:4px 8px; border-bottom:1px solid rgba(255,255,255,0.06);
+  padding:4px 8px; border-bottom:1px solid rgba(255,255,255,0.06); flex-wrap:wrap; gap:8px;
 }
 .timeline-toolbar .tl-label { font-weight:700; color:#e6eef8; margin-right:8px; font-size:11px; letter-spacing:.2px; }
 .timeline-scroller { overflow: auto; background: #161616; }
@@ -510,6 +518,49 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
 /* Playback highlight in sidebar */
 @keyframes playingPulse { from { box-shadow: 0 0 0 rgba(217,250,0,0.00); } to { box-shadow: 0 0 16px rgba(217,250,0,0.18); } }
 .frame.playing { border-color: rgba(217,250,0,0.65); background: rgba(217,250,0,0.05); animation: playingPulse 1.2s ease-in-out infinite alternate; }
+
+@media (max-width: 1368px) {
+  /* Smaller UI density for ~1366p without forcing browser zoom */
+  .sidebar { width: clamp(236px, 23.5vw, 296px); } /* +20px */
+  /* Give right column room so music/delete never get clipped */
+  .frame{ grid-template-columns:48px 1fr minmax(118px, 152px); gap:8px; }
+  .duration-group .input { width: 44px !important; padding:6px; }
+  .duration-group span.small-muted { font-size: 11px; }
+  .canvas-toolbar .btn { padding: 6px 8px; font-size: 13px; }
+  .toolbtn { width:32px; height:32px; font-size:18px; }
+  #sizeRange { width: 120px; }
+  .mode-toggle button { padding: 8px 10px; }
+  .logo { font-size: 14px; }
+  .badge { font-size: 11px; }
+  /* tighter stage */
+  .canvas-stage { max-height: 52dvh; }
+  /* Nudge modal down so header and rulers are not flush to top */
+  .dialog { align-items: flex-start; padding-top: 28px; }
+  /* Delete button: icon-only at 1366 */
+  #removeFrame .btn-label-delete { display: none; }
+  /* Add small left gap between thumbnail and desc */
+  .frame .meta { padding-left: 4px; }
+}
+/* Keep FPS badge on one line */
+#fpsBadge{ white-space: nowrap; }
+
+/* Body-level dropdown portal styles */
+#fileMenu.portal { position: fixed !important; top: 0; left: 0; transform: translate(-9999px,-9999px); opacity: 0; pointer-events: none; }
+#fileMenu.portal.open { opacity: 1; pointer-events: auto; transform: none; }
+
+/* Dialog overlay background to avoid visual white gaps behind modal */
+.dialog{background: rgba(0,0,0,0.4);}
+
+/* Header controls anti-overlap tweaks */
+#projectTitle{min-width:0; width:100%;}
+
+/* Logo text variants */
+.logo-text-short{ display:none; }
+@media (max-width: 1368px){ .logo-text-full{ display:none; } .logo-text-short{ display:inline; } }
+/* Ensure frame title input has room for word like 'Desc' */
+.frame .frame-title{ min-width: 64px; }
+/* Portal dropdown visibility */
+#fileMenu.portal{ display:block; z-index: 2500; }
 </style>
 </head>
 <body>
@@ -517,7 +568,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
   <div class="sidebar">
     <div class="header">
       <div class="logo"><i class='bx bxs-story'><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 343.18" width="15" height="15"><defs><style>.cls-1{fill:#000;}</style></defs><g id="Layer_2" data-name="Layer 2"><g id="Layer_2-2" data-name="Layer 2"><path class="cls-1" d="M256,119.65,200,73.56a32.13,32.13,0,0,0-15.48-12.74L115,3.53c-6.6-5.44-12-4.48-12,2.12v53H32a32,32,0,0,0-32,32v196a32,32,0,0,0,32,32H173a32.07,32.07,0,0,0,30.48-22.26L256,339.65c6.6,5.43,12,4.48,12-2.12v-196C268,134.93,262.6,125.08,256,119.65Zm-91,159H40v-180h63v103c0,6.6,5.4,16.44,12,21.88l50,41.18Z"/></g></g></svg>
-      </i> LadaBoard</div>
+      </i> <span class="logo-text-full">LadaBoard</span><span class="logo-text-short">LadaBo</span></div>
       <div class="controls">
         <div class="mode-toggle" id="modeToggle">
           <span class="toggle-thumb" aria-hidden="true"></span>
@@ -537,7 +588,7 @@ textarea.input{resize:both;min-height:44px;max-height:140px;min-width:120px}
     <div class="row">
       <button class="btn" id="addFrame"><i class='bx bx-plus'></i> New Frame</button>
       <button class="btn" id="duplicateFrame"><i class='bx bx-copy'></i> Duplicate</button>
-      <button class="btn" id="removeFrame"><i class='bx bx-trash'></i> Delete</button>
+      <button class="btn" id="removeFrame"><i class='bx bx-trash'></i> <span class="btn-label-delete">Delete</span></button>
     </div>
 
     <div class="list" id="framesList" ondragover="event.preventDefault()"></div>
@@ -963,16 +1014,38 @@ function closeFileDropdown(){
     if (!fileDropdownEl) return;
     fileDropdownEl.classList.remove('open');
     closeAllSubmenus();
+    if (fileMenu) fileMenu.classList.remove('open');
   } catch(_){}
 }
 if (fileMenuBtn) {
   fileMenuBtn.addEventListener('click', (e)=>{
     e.stopPropagation();
     const willOpen = !fileDropdownEl.classList.contains('open');
+    const isMobile = window.innerWidth <= 1024;
     if (willOpen) {
       fileDropdownEl.classList.add('open');
+      if (!isMobile && fileMenu) {
+        // Portal to body for desktop
+        if (!fileMenu.classList.contains('portal')) {
+          fileMenu.classList.add('portal');
+          document.body.appendChild(fileMenu);
+        }
+        const rect = fileMenuBtn.getBoundingClientRect();
+        const menuRect = { w: Math.max(220, 0) };
+        // Position below button, align left edges; constrain to viewport
+        let left = Math.round(rect.left);
+        let top = Math.round(rect.bottom + 8);
+        const maxLeft = Math.max(0, window.innerWidth - 260);
+        if (left > maxLeft) left = maxLeft;
+        // apply size/position
+        fileMenu.style.minWidth = '240px';
+        fileMenu.style.left = left + 'px';
+        fileMenu.style.top = top + 'px';
+        fileMenu.classList.add('open');
+      }
     } else {
       closeFileDropdown();
+      if (fileMenu) fileMenu.classList.remove('open');
     }
   });
   // prevent accidental close when interacting inside the menu
@@ -983,9 +1056,9 @@ if (fileMenuBtn) {
   }
   // close on outside interaction / escape
   ['click','touchstart'].forEach((evt)=>{
-    document.addEventListener(evt, ()=> closeFileDropdown(), { passive: true });
+    document.addEventListener(evt, ()=> { closeFileDropdown(); if (fileMenu) fileMenu.classList.remove('open'); }, { passive: true });
   });
-  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeFileDropdown(); });
+  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') { closeFileDropdown(); if (fileMenu) fileMenu.classList.remove('open'); } });
 
   // toggle submenus on tap for mobile, and close others when opening one
   const submenuToggles = fileDropdownEl.querySelectorAll('.submenu-toggle');
@@ -2523,6 +2596,8 @@ function drawPreview(){
 // drawing modal (improved)
 function openDraw(initial = null){
   drawDialog.classList.add('open');
+  // Ensure the modal fits the viewport immediately
+  try { fitDrawModal(); setTimeout(fitDrawModal, 0); setTimeout(fitDrawModal, 180); } catch(_){}
   resetOnionOverlayState();
   // reset drawing state and initialize new bitmap system
   baseImage = null;
@@ -2546,7 +2621,7 @@ function openDraw(initial = null){
   dctx.fillStyle = '#fff';
   dctx.fillRect(0,0,drawCanvas.width,drawCanvas.height);
   // ensure visual background is white so eraser holes don't look black
-  try { drawCanvas.style.background = '#ffffff'; } catch(_){}
+  try { drawCanvas.style.background = '#ffffff'; } catch(_){ }
 
   // Prefetch onion neighbors for the frame being edited (prioritize immediate)
   try { 
@@ -2583,6 +2658,7 @@ function openDraw(initial = null){
           renderOnionSkinsOverlay(idx); 
           drawOutsideRulers(); 
         } catch(e){}
+        try { fitDrawModal(); } catch(_){ }
       }, 40);
     });
   }
@@ -2607,6 +2683,7 @@ function openDraw(initial = null){
   // Save initial state after everything is set up
   setTimeout(() => {
     saveCanvasState();
+    try { fitDrawModal(); } catch(_){ }
   }, 100);
 
   // focus canvas so keyboard shortcuts work
@@ -2614,6 +2691,8 @@ function openDraw(initial = null){
 }
 function closeDraw(){ 
   drawDialog.classList.remove('open'); 
+  // reset any scaling on close
+  try { const modal = drawDialog.querySelector('.modal'); if (modal) modal.style.setProperty('--modal-scale','1'); } catch(_){}
   baseImage = null; 
   // Clear onion skin dan guide overlay saat modal ditutup
   octx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
@@ -2622,13 +2701,36 @@ function closeDraw(){
   insertImage = null;
   applyImageBtn && (applyImageBtn.style.display = 'none');
   // restore visual background
-  try { drawCanvas.style.background = 'transparent'; } catch(_){}
+  try { drawCanvas.style.background = 'transparent'; } catch(_){ }
   // hide outside rulers
   try { const rt = document.getElementById('rulerTop'); const rl = document.getElementById('rulerLeft'); if (rt) rt.style.display = 'none'; if (rl) rl.style.display = 'none'; } catch(_){ }
   // clear stable ref index
   currentOnionRefIndex = null;
   resetOnionOverlayState();
 }
+// Strengthen modal fit logic (extra ~10% shrink on small screens)
+function fitDrawModal() {
+  try {
+    if (!drawDialog || !drawDialog.classList.contains('open')) return;
+    const modal = drawDialog.querySelector('.modal');
+    if (!modal) return;
+    modal.style.setProperty('--modal-scale','1');
+    const maxW = Math.max(320, window.innerWidth - 16);
+    const maxH = Math.max(320, window.innerHeight - 16);
+    const naturalW = modal.scrollWidth;
+    const naturalH = modal.scrollHeight;
+    let s = Math.min(1, maxW / naturalW, maxH / naturalH);
+    // Extra shrink for 1366–1440 width screens to avoid covered toolbars
+    if (window.innerWidth <= 1440) s *= 0.88;
+    s = Math.max(0.5, Math.min(1, s));
+    modal.style.setProperty('--modal-scale', String(s));
+  } catch(_) {}
+}
+// Keep the scale up-to-date when resizing the window
+window.addEventListener('resize', () => { if (drawDialog && drawDialog.classList.contains('open')) fitDrawModal(); });
+// Rename late duplicate stubs so they no longer override the real functions
+function openDraw_stub_remnant(initial = null){ /* deprecated stub (kept to avoid merge conflicts) */ }
+function closeDraw_stub_remnant(){ /* deprecated stub (kept to avoid merge conflicts) */ }
 
 // toolbar events
 document.querySelectorAll('.canvas-toolbar [data-tool]').forEach(b=>b.addEventListener('click',()=>{ document.querySelectorAll('.canvas-toolbar [data-tool]').forEach(x=>x.classList.remove('active')); b.classList.add('active'); tool=b.dataset.tool; }));
@@ -4515,10 +4617,10 @@ const tl = {
   scroller: null,
   zoom: 0.6,            // default zoomed out
   basePxPerFrame: 6,    // compact grid
-  rowHeight: 24,
-  headerH: 56,
+  rowHeight: 20,
+  headerH: 44,
   gutterW: 100,
-  bottomPad: 12,
+  bottomPad: 8,
   selection: new Set(),
   drag: null,
   playhead: 0,
@@ -4633,7 +4735,7 @@ function renderTimeline(){
       ctx.fillStyle = '#9aa3b2';
       ctx.font = '12px Segoe UI, Roboto, system-ui, sans-serif';
       const sec = f / fps;
-      ctx.fillText(String(sec), Math.round(x + 8), 22);
+      ctx.fillText(String(sec), Math.round(x + 6), 18);
     }
   }
 
@@ -4657,8 +4759,8 @@ function renderTimeline(){
     const f = state.frames[i];
     const dur = Math.max(1, safeNumber(f?.duration, state.defaultDuration));
     const spanW = dur * pxpf;
-    const y = tl.headerH + 2;
-    const height = tl.rowHeight - 4;
+    const y = tl.headerH + 1;
+    const height = tl.rowHeight - 2;
 
     const toX = toMap.get(f) ?? tl.gutterW;
     const fromX = anim && anim.fromMap ? (anim.fromMap.get(f) ?? toX) : toX;
@@ -5249,6 +5351,30 @@ function drawOnionTintedCached(ctx, frame, isWarm, aBase){
   } catch(_) { return false; }
 }
 // ... existing code ...
+
+// Auto-scale draw/edit modal to fit viewport without scrollbars
+function fitDrawModal() {
+  try {
+    if (!drawDialog || !drawDialog.classList.contains('open')) return;
+    const modal = drawDialog.querySelector('.modal');
+    if (!modal) return;
+    // reset scale to measure natural size
+    modal.style.setProperty('--modal-scale','1');
+    // compute available size
+    const maxW = Math.max(320, window.innerWidth - 16);
+    const maxH = Math.max(320, window.innerHeight - 16);
+    const naturalW = modal.scrollWidth;
+    const naturalH = modal.scrollHeight;
+    let s = Math.min(1, maxW / naturalW, maxH / naturalH);
+    // Extra shrink for 1366–1440 width screens to avoid covered toolbars
+    if (window.innerWidth <= 1440) s *= 0.88;
+    s = Math.max(0.5, Math.min(1, s));
+    modal.style.setProperty('--modal-scale', String(s));
+  } catch(_) {}
+}
+// ... existing code ...
+// Ensure scaling updates on viewport changes while modal is open
+window.addEventListener('resize', () => { if (drawDialog && drawDialog.classList.contains('open')) fitDrawModal(); });
 
 </script>
 </body>
